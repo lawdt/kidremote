@@ -79,6 +79,31 @@ internal sealed class OverlayManager : IDisposable
         foreach (var window in _windows) window.Render(state, _phrase);
     }
 
+    /// <summary>
+    /// Отпускает экран на время родительского диалога: иначе удержание поверх всех окон
+    /// перекрывает ввод пароля, а хук съедает клавиши.
+    /// </summary>
+    public void SuspendGuard()
+    {
+        if (!_visible) return;
+
+        _keepOnTop.Stop();
+        _keyboard.Disable();
+
+        foreach (var window in _windows) window.Topmost = false;
+    }
+
+    public void ResumeGuard()
+    {
+        if (!_visible) return;
+
+        foreach (var window in _windows) window.Topmost = true;
+
+        if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
+        _keepOnTop.Start();
+        Reassert();
+    }
+
     public void Hide()
     {
         if (!_visible) return;

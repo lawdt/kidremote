@@ -31,6 +31,7 @@ public partial class App : Application
     private CountdownWindow _countdown = null!;
     private AlertFrameWindow _frame = null!;
     private OverlayManager _overlay = null!;
+    private HotkeyListener _hotkey = null!;
 
     private readonly Stopwatch _tickWatch = Stopwatch.StartNew();
     private DispatcherTimer? _ticker;
@@ -91,6 +92,9 @@ public partial class App : Application
 
         _tray = new TrayIcon();
         _tray.OpenConfigRequested += OpenConfig;
+
+        _hotkey = new HotkeyListener();
+        _hotkey.Pressed += OnUnlockHotkey;
 
         _bot = new BotService(_config, _bank, _store, _state, () => _activity.Capture());
         _bot.ShutdownRequested += RequestShutdown;
@@ -280,6 +284,45 @@ public partial class App : Application
         Shutdown();
     });
 
+    /// <summary>
+    /// Ctrl+Alt+F1 — разблокировка за компьютером, когда телефона под рукой нет.
+    /// Работает только по родительскому паролю.
+    /// </summary>
+    private void OnUnlockHotkey()
+    {
+        if (!_config.HasPassword)
+        {
+            _tray.ShowMessage("KidRemote", "Сначала задайте пароль в боте: /password ваш_пароль");
+            return;
+        }
+
+        _overlay.SuspendGuard();
+
+        try
+        {
+            var prompt = new PasswordWindow("Разблокировка компьютера. Введите родительский пароль.",
+                _config.VerifyPassword);
+
+            if (prompt.ShowDialog() != true) return;
+
+            var unlock = new UnlockWindow(_bank.RemainingSeconds);
+            if (unlock.ShowDialog() != true) return;
+
+            if (unlock.Unlimited) _bank.SetUnlimited(true);
+            else _bank.Add(unlock.Seconds);
+
+            if (_bank.IsPaused) _bank.SetPaused(false);
+
+            Persist();
+            _ = _bot.RefreshPanelsAsync(force: true);
+            _ = _bot.NotifyAsync("🔓 Разблокировано с компьютера по паролю.");
+        }
+        finally
+        {
+            _overlay.ResumeGuard();
+        }
+    }
+
     /// <summary>Настройки из трея открываются только по родительскому паролю.</summary>
     private void OpenConfig()
     {
@@ -348,6 +391,7 @@ public partial class App : Application
         }
 
         _bot?.Dispose();
+        _hotkey?.Dispose();
         _overlay?.Dispose();
         _tray?.Dispose();
         _activity?.Dispose();
