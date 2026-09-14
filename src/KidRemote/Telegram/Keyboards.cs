@@ -55,10 +55,59 @@ internal static class Keyboards
 
         rows.Add(new List<InlineKeyboardButton>
         {
+            InlineKeyboardButton.Create("⚙️ Настройки", "settings"),
             InlineKeyboardButton.Create("👪 Родители", "parents")
         });
 
         return new InlineKeyboardMarkup { InlineKeyboard = rows };
+    }
+
+    /// <summary>Короткие добавки в сообщении о том, что время кончилось.</summary>
+    public static InlineKeyboardMarkup QuickAdd()
+    {
+        return new InlineKeyboardMarkup
+        {
+            InlineKeyboard = new List<List<InlineKeyboardButton>>
+            {
+                new()
+                {
+                    InlineKeyboardButton.Create("+1 мин", "ask:add:60"),
+                    InlineKeyboardButton.Create("+3 мин", "ask:add:180"),
+                    InlineKeyboardButton.Create("+5 мин", "ask:add:300")
+                },
+                new()
+                {
+                    InlineKeyboardButton.Create("+15 мин", "ask:add:900"),
+                    InlineKeyboardButton.Create("+30 мин", "ask:add:1800")
+                },
+                new()
+                {
+                    InlineKeyboardButton.Create("📋 Открыть панель", "status")
+                }
+            }
+        };
+    }
+
+    /// <summary>Переключатели прямо в чате: их видно и меняются одним нажатием.</summary>
+    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool alarms)
+    {
+        return new InlineKeyboardMarkup
+        {
+            InlineKeyboard = new List<List<InlineKeyboardButton>>
+            {
+                new()
+                {
+                    InlineKeyboardButton.Create(
+                        $"{(requireFullscreen ? "☑️" : "⬜️")} Только полноэкранные игры", "toggle:fullscreen")
+                },
+                new()
+                {
+                    InlineKeyboardButton.Create(
+                        $"{(alarms ? "☑️" : "⬜️")} Сигнализация: звук и рамка", "toggle:alarms")
+                },
+                new() { InlineKeyboardButton.Create("⬅️ Назад", "status") }
+            }
+        };
     }
 
     /// <summary>Экран подтверждения: действие применяется только после явного «да».</summary>

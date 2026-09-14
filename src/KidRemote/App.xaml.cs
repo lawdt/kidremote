@@ -181,7 +181,7 @@ public partial class App : Application
         _lastConsuming = snapshot.ShouldConsume;
 
         var blocked = state is BankState.Locked or BankState.Paused;
-        var danger = state == BankState.Running && snapshot.ShouldConsume
+        var danger = _config.AlarmsEnabled && state == BankState.Running && snapshot.ShouldConsume
                      && remaining > 0 && remaining <= _config.DangerSeconds;
 
         _frame.SetActive(danger);
@@ -222,7 +222,7 @@ public partial class App : Application
     /// </summary>
     private void Signal(long remaining)
     {
-        if (remaining <= 0) return;
+        if (remaining <= 0 || !_config.AlarmsEnabled) return;
 
         if (remaining <= FinalCountdownSeconds)
         {
@@ -249,7 +249,7 @@ public partial class App : Application
         _ = _bot.RefreshPanelsAsync(force: true);
 
         if (current == BankState.Locked && previous != BankState.Locked)
-            _ = _bot.NotifyAsync("🔒 Время вышло, компьютер заблокирован.");
+            _ = _bot.NotifyTimeUpAsync();
     }
 
     private void OnBankChanged()

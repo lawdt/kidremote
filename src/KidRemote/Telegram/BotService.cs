@@ -347,6 +347,42 @@ internal sealed partial class BotService : IDisposable
                 return;
             }
 
+            case "settings":
+            {
+                MarkBusy(chatId, true);
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await ShowSettingsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "toggle":
+            {
+                var what = parts.Length > 1 ? parts[1] : string.Empty;
+                string toast;
+
+                switch (what)
+                {
+                    case "fullscreen":
+                        _config.RequireFullscreen = !_config.RequireFullscreen;
+                        toast = _config.RequireFullscreen
+                            ? "Только полноэкранные игры"
+                            : "Любое использование компьютера";
+                        break;
+                    case "alarms":
+                        _config.AlarmsEnabled = !_config.AlarmsEnabled;
+                        toast = _config.AlarmsEnabled ? "Сигнализация включена" : "Сигнализация выключена";
+                        break;
+                    default:
+                        toast = string.Empty;
+                        break;
+                }
+
+                _config.Save();
+                await _client.AnswerCallbackAsync(callback.Id, toast, ct).ConfigureAwait(false);
+                await ShowSettingsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
             case "parents":
             {
                 MarkBusy(chatId, true);
@@ -577,6 +613,34 @@ internal sealed partial class BotService : IDisposable
         }
     }
 
+    /// <summary>Сообщение о блокировке с кнопками быстрой добавки.</summary>
+    public async Task NotifyTimeUpAsync()
+    {
+        var ct = _cts.Token;
+        if (ct.IsCancellationRequested) return;
+
+        var snapshot = _activity();
+        var sb = new StringBuilder();
+        sb.AppendLine("🔒 <b>Время вышло</b>");
+        sb.AppendLine("Компьютер заблокирован.");
+
+        if (snapshot.ForegroundProcess is { Length: > 0 } process)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Последнее приложение: {process}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Можно добавить немного времени прямо отсюда.");
+
+        var text = sb.ToString().TrimEnd();
+
+        foreach (var chatId in _config.ParentChatIds.ToArray())
+        {
+            await _client.SendMessageAsync(chatId, text, Keyboards.QuickAdd(), ct).ConfigureAwait(false);
+        }
+    }
+
     public async Task NotifyAsync(string text)
     {
         var ct = _cts.Token;
@@ -616,6 +680,32 @@ internal sealed partial class BotService : IDisposable
         RememberPanel(chatId, messageId);
         _lastPanelText = BuildStatusText();
         await EditAsync(chatId, messageId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+    }
+
+    private async Task ShowSettingsAsync(long chatId, long messageId, CancellationToken ct)
+    {
+        if (messageId == 0) return;
+
+        MarkBusy(chatId, true);
+        await EditAsync(chatId, messageId, BuildSettingsText(),
+            Keyboards.Settings(_config.RequireFullscreen, _config.AlarmsEnabled), ct).ConfigureAwait(false);
+    }
+
+    private string BuildSettingsText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>Настройки</b>");
+        sb.AppendLine();
+        sb.AppendLine(_config.RequireFullscreen
+            ? "Время расходуется только когда открыта полноэкранная игра."
+            : "Время расходуется при любом использовании компьютера.");
+        sb.AppendLine();
+        sb.AppendLine(_config.AlarmsEnabled
+            ? "На последней минуте звучит сигнал и мигает красная рамка."
+            : "Сигнал и рамка отключены, остаётся только таймер в углу.");
+        sb.AppendLine();
+        sb.AppendLine($"Пауза при простое: {_config.IdlePauseSeconds} с.");
+        return sb.ToString().TrimEnd();
     }
 
     private async Task ShowDraftAsync(long chatId, long messageId, CancellationToken ct)
