@@ -17,7 +17,7 @@
             CornerRadius="12"
             Padding="16,8">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <TextBlock x:Name="Label"
+            <TextBlock x:Name="TimeText"
                        Text="00:00"
                        FontFamily="Consolas, Courier New"
                        FontSize="34"

@@ -74,19 +74,19 @@ public partial class CountdownWindow : Window
     {
         if (state == BankState.Unlimited)
         {
-            Label.Text = "БЕЗЛИМИТ";
-            Label.FontSize = 24;
-            Label.Foreground = UnlimitedBrush;
+            TimeText.Text = "БЕЗЛИМИТ";
+            TimeText.FontSize = 24;
+            TimeText.Foreground = UnlimitedBrush;
             Root.Opacity = 1;
             return;
         }
 
-        Label.FontSize = 34;
-        Label.Text = TimeFormat.Compact(remainingSeconds);
+        TimeText.FontSize = 34;
+        TimeText.Text = TimeFormat.Compact(remainingSeconds);
 
         if (!consuming)
         {
-            Label.Foreground = IdleBrush;
+            TimeText.Foreground = IdleBrush;
             Root.Opacity = 0.75;
             return;
         }
@@ -95,17 +95,17 @@ public partial class CountdownWindow : Window
 
         if (remainingSeconds <= _config.DangerSeconds)
         {
-            Label.Foreground = DangerBrush;
+            TimeText.Foreground = DangerBrush;
             if (valueChanged && remainingSeconds % 5 == 0) Blink(160);
         }
         else if (remainingSeconds <= _config.WarnSeconds)
         {
-            Label.Foreground = WarnBrush;
+            TimeText.Foreground = WarnBrush;
             if (valueChanged && remainingSeconds % 60 == 0) Blink(320);
         }
         else
         {
-            Label.Foreground = NormalBrush;
+            TimeText.Foreground = NormalBrush;
         }
     }
 
