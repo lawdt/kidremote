@@ -17,7 +17,6 @@ internal sealed class OverlayManager : IDisposable
     private readonly KeyboardBlocker _keyboard = new();
     private readonly List<LockOverlayWindow> _windows = new();
     private readonly DispatcherTimer _keepOnTop;
-    private readonly DispatcherTimer _phraseTimer;
 
     private bool _visible;
     private string _phrase = string.Empty;
@@ -31,19 +30,6 @@ internal sealed class OverlayManager : IDisposable
             Interval = TimeSpan.FromMilliseconds(700)
         };
         _keepOnTop.Tick += (_, _) => Reassert();
-
-        // Одна и та же фраза за полчаса приедается, поэтому меняем её по кругу.
-        _phraseTimer = new DispatcherTimer(DispatcherPriority.Background)
-        {
-            Interval = TimeSpan.FromSeconds(25)
-        };
-        _phraseTimer.Tick += (_, _) => ShufflePhrase();
-    }
-
-    private void ShufflePhrase()
-    {
-        _phrase = Motivation.Next();
-        foreach (var window in _windows) window.Render(_state, _phrase);
     }
 
     public bool IsVisible => _visible;
@@ -58,6 +44,8 @@ internal sealed class OverlayManager : IDisposable
 
         _visible = true;
         _state = state;
+
+        // Новая фраза на каждую блокировку.
         _phrase = Motivation.Next();
 
         // Эксклюзивный полноэкранный режим перекрывает любые чужие окна — сворачиваем игру,
@@ -80,7 +68,6 @@ internal sealed class OverlayManager : IDisposable
 
         if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
         _keepOnTop.Start();
-        if (state == BankState.Locked) _phraseTimer.Start();
         Reassert();
     }
 
@@ -90,10 +77,6 @@ internal sealed class OverlayManager : IDisposable
 
         _state = state;
         foreach (var window in _windows) window.Render(state, _phrase);
-
-        // Фразы нужны только на экране «время вышло»; на паузе там своя подпись.
-        if (state == BankState.Locked) _phraseTimer.Start();
-        else _phraseTimer.Stop();
     }
 
     public void Hide()
@@ -102,7 +85,6 @@ internal sealed class OverlayManager : IDisposable
         _visible = false;
 
         _keepOnTop.Stop();
-        _phraseTimer.Stop();
         _keyboard.Disable();
 
         foreach (var window in _windows) window.CloseForReal();

@@ -38,28 +38,27 @@ public partial class LockOverlayWindow : Window
         {
             Glyph.Text = "⏸";
             Headline.Text = "Перерыв";
-            SetSubtitle("Время на паузе и не расходуется");
+            Subtitle.Text = "Время на паузе и не расходуется";
+            Subtitle.Visibility = Visibility.Visible;
         }
         else
         {
+            // На экране блокировки вместо констатации факта — фраза, ради которой стоит встать.
             Glyph.Text = "🔒";
-            Headline.Text = "Время вышло";
-            SetSubtitle(phrase);
+            Headline.Text = phrase;
+            Subtitle.Visibility = Visibility.Collapsed;
         }
+
+        FadeIn();
     }
 
-    private void SetSubtitle(string text)
+    private void FadeIn()
     {
-        if (Subtitle.Text == text) return;
-
-        Subtitle.Text = text;
-
-        // Новая фраза проявляется, а не подменяется рывком.
-        Subtitle.BeginAnimation(OpacityProperty, new DoubleAnimation
+        Headline.BeginAnimation(OpacityProperty, new DoubleAnimation
         {
             From = 0.0,
             To = 1.0,
-            Duration = TimeSpan.FromMilliseconds(450),
+            Duration = TimeSpan.FromMilliseconds(600),
             FillBehavior = FillBehavior.Stop
         });
     }

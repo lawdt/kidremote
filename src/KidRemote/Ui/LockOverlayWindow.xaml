@@ -22,9 +22,12 @@
             <TextBlock x:Name="Headline"
                        Text=""
                        FontFamily="Segoe UI"
-                       FontSize="52"
+                       FontSize="42"
                        FontWeight="SemiBold"
                        Foreground="#F5F7FF"
+                       MaxWidth="900"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
                        HorizontalAlignment="Center"/>
 
             <TextBlock x:Name="Subtitle"
