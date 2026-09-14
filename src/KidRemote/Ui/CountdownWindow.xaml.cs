@@ -16,18 +16,30 @@ public partial class CountdownWindow : Window
     private static readonly Brush IdleBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
     private static readonly Brush UnlimitedBrush = new SolidColorBrush(Color.FromRgb(0x40, 0xC4, 0xFF));
 
+    private static readonly Brush CalmBackground = new SolidColorBrush(Color.FromArgb(0xB3, 0x00, 0x00, 0x00));
+    private static readonly Brush DangerBackground = new SolidColorBrush(Color.FromArgb(0xD9, 0x5A, 0x00, 0x12));
+
+    /// <summary>Насколько близко к плашке должен подойти курсор, чтобы она спряталась.</summary>
+    private const int HoverMargin = 60;
+
     private readonly AppConfig _config;
+    private bool _hidden;
 
-    internal CountdownWindow(AppConfig config)
+    static CountdownWindow()
     {
-        _config = config;
-        InitializeComponent();
-
         NormalBrush.Freeze();
         WarnBrush.Freeze();
         DangerBrush.Freeze();
         IdleBrush.Freeze();
         UnlimitedBrush.Freeze();
+        CalmBackground.Freeze();
+        DangerBackground.Freeze();
+    }
+
+    internal CountdownWindow(AppConfig config)
+    {
+        _config = config;
+        InitializeComponent();
 
         Loaded += OnLoaded;
         // Ширина плашки меняется вместе с текстом — держим её приклеенной к углу.
@@ -69,6 +81,27 @@ public partial class CountdownWindow : Window
         Top = top / scale.DpiScaleY;
     }
 
+    /// <summary>
+    /// Прячет плашку, когда курсор подходит вплотную: окно сквозное для мыши,
+    /// поэтому событий наведения у него нет и близость считаем сами.
+    /// </summary>
+    public void UpdateCursorProximity()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        if (!NativeMethods.GetWindowRect(handle, out var rect)) return;
+
+        var cursor = Forms.Cursor.Position;
+        var near =
+            cursor.X >= rect.Left - HoverMargin && cursor.X <= rect.Right + HoverMargin &&
+            cursor.Y >= rect.Top - HoverMargin && cursor.Y <= rect.Bottom + HoverMargin;
+
+        if (near == _hidden) return;
+
+        _hidden = near;
+        Opacity = near ? 0 : 1;
+    }
+
     /// <summary>Рисует остаток. Мигание запускается только когда значение реально изменилось.</summary>
     internal void Render(BankState state, long remainingSeconds, bool consuming, bool valueChanged)
     {
@@ -77,6 +110,7 @@ public partial class CountdownWindow : Window
             TimeText.Text = "БЕЗЛИМИТ";
             TimeText.FontSize = 24;
             TimeText.Foreground = UnlimitedBrush;
+            Root.Background = CalmBackground;
             Root.Opacity = 1;
             return;
         }
@@ -87,6 +121,7 @@ public partial class CountdownWindow : Window
         if (!consuming)
         {
             TimeText.Foreground = IdleBrush;
+            Root.Background = CalmBackground;
             Root.Opacity = 0.75;
             return;
         }
@@ -96,28 +131,31 @@ public partial class CountdownWindow : Window
         if (remainingSeconds <= _config.DangerSeconds)
         {
             TimeText.Foreground = DangerBrush;
-            if (valueChanged && remainingSeconds % 5 == 0) Blink(160);
+            Root.Background = DangerBackground;
+            if (valueChanged && remainingSeconds % 5 == 0) Blink(110, 3);
         }
         else if (remainingSeconds <= _config.WarnSeconds)
         {
             TimeText.Foreground = WarnBrush;
-            if (valueChanged && remainingSeconds % 60 == 0) Blink(320);
+            Root.Background = CalmBackground;
+            if (valueChanged && remainingSeconds % 60 == 0) Blink(260, 2);
         }
         else
         {
             TimeText.Foreground = NormalBrush;
+            Root.Background = CalmBackground;
         }
     }
 
-    private void Blink(int halfPeriodMs)
+    private void Blink(int halfPeriodMs, int times)
     {
         var animation = new DoubleAnimation
         {
             From = 1.0,
-            To = 0.15,
+            To = 0.0,
             Duration = TimeSpan.FromMilliseconds(halfPeriodMs),
             AutoReverse = true,
-            RepeatBehavior = new RepeatBehavior(2),
+            RepeatBehavior = new RepeatBehavior(times),
             // Без этого анимация "залипает" и дальнейшие присвоения Opacity перестают работать.
             FillBehavior = FillBehavior.Stop
         };

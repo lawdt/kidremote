@@ -201,8 +201,7 @@ internal sealed partial class BotService : IDisposable
                 break;
 
             case "/quit":
-                await _client.SendMessageAsync(chatId, "Закрываю приложение на компьютере.", null, ct).ConfigureAwait(false);
-                ShutdownRequested?.Invoke();
+                await RequestAsync(chatId, "quit", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/help":
@@ -280,6 +279,13 @@ internal sealed partial class BotService : IDisposable
             {
                 var kind = parts.Length > 1 ? parts[1] : string.Empty;
                 var argument = parts.Length > 2 && long.TryParse(parts[2], out var parsed) ? parsed : 0;
+
+                if (kind == "quit")
+                {
+                    await _client.AnswerCallbackAsync(callback.Id, "Выключаюсь", ct).ConfigureAwait(false);
+                    await QuitAsync(chatId, messageId, ct).ConfigureAwait(false);
+                    return;
+                }
 
                 var toast = Apply(kind, argument);
                 await _client.AnswerCallbackAsync(callback.Id, toast, ct).ConfigureAwait(false);
@@ -402,6 +408,12 @@ internal sealed partial class BotService : IDisposable
     {
         if (!_config.ConfirmActions)
         {
+            if (kind == "quit")
+            {
+                await QuitAsync(chatId, 0, ct).ConfigureAwait(false);
+                return;
+            }
+
             Apply(kind, argument);
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
             return;
@@ -422,6 +434,23 @@ internal sealed partial class BotService : IDisposable
     private bool IsBusy(long chatId)
     {
         lock (_busySync) return _busyChats.Contains(chatId);
+    }
+
+    /// <summary>Сообщает о выходе и только потом просит приложение закрыться.</summary>
+    private async Task QuitAsync(long chatId, long messageId, CancellationToken ct)
+    {
+        const string text = "🚪 Приложение закрыто на компьютере.\n\n" +
+                            "Пока оно не запущено, ограничение не действует. " +
+                            "Запустите KidRemote снова, чтобы вернуть контроль.";
+
+        if (messageId != 0)
+            await EditAsync(chatId, messageId, text, null, ct).ConfigureAwait(false);
+        else
+            await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
+
+        await BroadcastAsync("🚪 KidRemote закрыт на компьютере.", chatId, ct).ConfigureAwait(false);
+
+        ShutdownRequested?.Invoke();
     }
 
     private Draft GetDraft(long chatId)
@@ -473,6 +502,10 @@ internal sealed partial class BotService : IDisposable
             case "lock":
                 sb.AppendLine("Заблокировать прямо сейчас?");
                 sb.AppendLine($"Остаток {TimeFormat.Human(remaining)} сгорит.");
+                break;
+            case "quit":
+                sb.AppendLine("Закрыть приложение на компьютере?");
+                sb.AppendLine("Ограничение перестанет действовать, пока вы не запустите его снова.");
                 break;
             default:
                 sb.AppendLine("Подтвердить действие?");
@@ -577,7 +610,7 @@ internal sealed partial class BotService : IDisposable
         await EditAsync(chatId, messageId, BuildDraftText(chatId), Keyboards.Draft(GetDraft(chatId).Absolute), ct).ConfigureAwait(false);
     }
 
-    private Task EditAsync(long chatId, long messageId, string text, InlineKeyboardMarkup markup, CancellationToken ct) =>
+    private Task EditAsync(long chatId, long messageId, string text, InlineKeyboardMarkup? markup, CancellationToken ct) =>
         messageId == 0 ? Task.CompletedTask : _client.EditMessageAsync(chatId, messageId, text, markup, ct);
 
     private void RememberPanel(long chatId, long messageId)

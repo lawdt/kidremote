@@ -1,22 +1,94 @@
-﻿namespace KidRemote.Ui;
+﻿using System.IO;
+using System.Media;
 
+namespace KidRemote.Ui;
+
+/// <summary>
+/// Звуковые сигналы. Тон синтезируется в память и проигрывается через звуковую карту:
+/// Console.Beep на многих машинах уходит в системный динамик, которого физически нет.
+/// </summary>
 internal static class Alarm
 {
-    /// <summary>Короткий негромкий сигнал за минуту до блокировки.</summary>
-    public static void OneMinuteWarning()
+    private const int SampleRate = 44100;
+
+    private static readonly Lazy<SoundPlayer?> Soft = new(() => Build(new[] { 880.0, 1175.0 }, 130, 0.20));
+    private static readonly Lazy<SoundPlayer?> Urgent = new(() => Build(new[] { 1568.0, 1568.0 }, 90, 0.28));
+
+    /// <summary>Мягкий сигнал на переходе минуты в жёлтой зоне.</summary>
+    public static void Minute() => Play(Soft.Value);
+
+    /// <summary>Резкий сигнал на последней минуте.</summary>
+    public static void LastMinute() => Play(Urgent.Value);
+
+    private static void Play(SoundPlayer? player)
     {
-        Task.Run(() =>
+        if (player is null) return;
+
+        try
         {
-            try
+            player.Play();
+        }
+        catch
+        {
+            // Нет звукового устройства — молчим, ронять приложение из-за писка незачем.
+        }
+    }
+
+    private static SoundPlayer? Build(double[] tones, int msEach, double amplitude)
+    {
+        try
+        {
+            var stream = new MemoryStream(WriteWav(tones, msEach, amplitude));
+            var player = new SoundPlayer(stream);
+            player.Load();
+            return player;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[] WriteWav(double[] tones, int msEach, double amplitude)
+    {
+        var samplesPerTone = SampleRate * msEach / 1000;
+        var total = samplesPerTone * tones.Length;
+
+        using var memory = new MemoryStream();
+        using var writer = new BinaryWriter(memory);
+
+        var dataSize = total * 2;
+        writer.Write("RIFF"u8.ToArray());
+        writer.Write(36 + dataSize);
+        writer.Write("WAVE"u8.ToArray());
+        writer.Write("fmt "u8.ToArray());
+        writer.Write(16);
+        writer.Write((short)1);              // PCM
+        writer.Write((short)1);              // моно
+        writer.Write(SampleRate);
+        writer.Write(SampleRate * 2);
+        writer.Write((short)2);
+        writer.Write((short)16);
+        writer.Write("data"u8.ToArray());
+        writer.Write(dataSize);
+
+        // Короткое нарастание и затухание убирают щелчки на краях тона.
+        var fade = Math.Max(1, samplesPerTone / 12);
+
+        for (var t = 0; t < tones.Length; t++)
+        {
+            for (var i = 0; i < samplesPerTone; i++)
             {
-                Console.Beep(880, 120);
-                Thread.Sleep(90);
-                Console.Beep(1175, 140);
+                var envelope = 1.0;
+                if (i < fade) envelope = i / (double)fade;
+                else if (i > samplesPerTone - fade) envelope = (samplesPerTone - i) / (double)fade;
+
+                var value = Math.Sin(2 * Math.PI * tones[t] * i / SampleRate) * amplitude * envelope;
+                writer.Write((short)(value * short.MaxValue));
             }
-            catch
-            {
-                // На машинах без системного динамика Beep кидает исключение — молча пропускаем.
-            }
-        });
+        }
+
+        writer.Flush();
+        return memory.ToArray();
     }
 }

@@ -15,6 +15,9 @@ public partial class App : Application
     private const double MaxTrustedDeltaSeconds = 2.0;
 
     private Mutex? _singleInstance;
+    private CancellationTokenSource? _guardCts;
+    private bool _guardMode;
+
     private AppConfig _config = null!;
     private StateStore _store = null!;
     private PersistedState _state = null!;
@@ -23,12 +26,14 @@ public partial class App : Application
     private BotService _bot = null!;
     private TrayIcon _tray = null!;
     private CountdownWindow _countdown = null!;
+    private AlertFrameWindow _frame = null!;
     private OverlayManager _overlay = null!;
 
     private readonly Stopwatch _tickWatch = Stopwatch.StartNew();
     private DispatcherTimer? _ticker;
     private DispatcherTimer? _persistTimer;
     private DispatcherTimer? _panelTimer;
+    private DispatcherTimer? _guardTimer;
 
     private long _lastRenderedSeconds = -1;
     private BankState _lastState = BankState.Locked;
@@ -38,16 +43,27 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        _singleInstance = new Mutex(true, @"Global\KidRemote.SingleInstance", out var isFirst);
+        // Сторожевой режим: ни окон, ни трея — только присмотр за основным процессом.
+        if (e.Args.Any(a => string.Equals(a, Watchdog.GuardArgument, StringComparison.OrdinalIgnoreCase)))
+        {
+            StartGuardMode();
+            return;
+        }
+
+        _singleInstance = new Mutex(true, Watchdog.MainMutexName, out var isFirst);
         if (!isFirst)
         {
             Shutdown();
             return;
         }
 
+        Watchdog.ClearShutdownFlag();
+
         _config = AppConfig.LoadOrCreate();
         if (string.IsNullOrWhiteSpace(_config.ResolvedToken))
         {
+            // Без токена приложение бесполезно, поэтому сторожу тоже незачем его поднимать.
+            Watchdog.AllowShutdown();
             PromptForToken();
             Shutdown();
             return;
@@ -68,6 +84,8 @@ public partial class App : Application
         _countdown = new CountdownWindow(_config);
         _countdown.Show();
 
+        _frame = new AlertFrameWindow();
+
         _tray = new TrayIcon();
         _tray.OpenConfigRequested += OpenConfig;
         _tray.ExitRequested += OnTrayExitRequested;
@@ -76,14 +94,28 @@ public partial class App : Application
         _bot.ShutdownRequested += RequestShutdown;
         _bot.Start();
 
+        if (_config.WatchdogEnabled) Watchdog.EnsureGuardRunning();
+
         StartTimers();
         RenderAll(force: true);
 
-        if (_config.NeedsParentBinding)
+        _tray.ShowMessage("KidRemote",
+            _config.NeedsParentBinding
+                ? "Напишите боту любое сообщение — этот чат станет родительским."
+                : "Работает. Значок в трее показывает остаток времени.");
+    }
+
+    private void StartGuardMode()
+    {
+        _guardMode = true;
+        _guardCts = new CancellationTokenSource();
+        var token = _guardCts.Token;
+
+        Task.Run(() =>
         {
-            _tray.ShowMessage("KidRemote",
-                "Напишите боту любое сообщение — этот чат станет родительским.");
-        }
+            Watchdog.RunGuard(token);
+            Dispatcher.BeginInvoke(() => Shutdown());
+        });
     }
 
     private void StartTimers()
@@ -109,6 +141,15 @@ public partial class App : Application
         };
         _panelTimer.Tick += (_, _) => _ = _bot.RefreshPanelsAsync();
         _panelTimer.Start();
+
+        if (!_config.WatchdogEnabled) return;
+
+        _guardTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(10)
+        };
+        _guardTimer.Tick += (_, _) => Watchdog.EnsureGuardRunning();
+        _guardTimer.Start();
     }
 
     private void OnTick(object? sender, EventArgs e)
@@ -120,6 +161,7 @@ public partial class App : Application
         if (delta <= MaxTrustedDeltaSeconds && snapshot.ShouldConsume)
             _bank.Consume(delta);
 
+        _countdown.UpdateCursorProximity();
         Render(snapshot);
     }
 
@@ -135,10 +177,12 @@ public partial class App : Application
         if (!force && !valueChanged && !stateChanged && !consumingChanged) return;
         _lastConsuming = snapshot.ShouldConsume;
 
-        if (valueChanged && stateChanged is false && state == BankState.Running && remaining == 60)
-            Alarm.OneMinuteWarning();
-
         var blocked = state is BankState.Locked or BankState.Paused;
+        var danger = state == BankState.Running && snapshot.ShouldConsume
+                     && remaining > 0 && remaining <= _config.DangerSeconds;
+
+        _frame.SetActive(danger);
+
         if (blocked)
         {
             _overlay.Show(state);
@@ -150,6 +194,9 @@ public partial class App : Application
             if (!_countdown.IsVisible) _countdown.Show();
             _countdown.Render(state, remaining, snapshot.ShouldConsume, valueChanged);
         }
+
+        if (valueChanged && state == BankState.Running && snapshot.ShouldConsume)
+            Signal(remaining);
 
         _tray.Render(state, remaining);
 
@@ -164,6 +211,23 @@ public partial class App : Application
             _ = _bot.NotifyAsync($"⏳ У ребёнка осталось {TimeFormat.Human(remaining)}.");
 
         _lastRenderedSeconds = remaining;
+    }
+
+    /// <summary>Звук и вспышка рамки: последняя минута — каждые 10 секунд, до неё — на каждой минуте.</summary>
+    private void Signal(long remaining)
+    {
+        if (remaining <= 0) return;
+
+        if (remaining <= _config.DangerSeconds)
+        {
+            if (remaining % 10 != 0) return;
+            Alarm.LastMinute();
+            _frame.Flash();
+            return;
+        }
+
+        if (remaining <= _config.WarnSeconds && remaining % 60 == 0)
+            Alarm.Minute();
     }
 
     private void OnStateTransition(BankState previous, BankState current)
@@ -202,7 +266,18 @@ public partial class App : Application
         RequestShutdown();
     }
 
-    internal void RequestShutdown() => Dispatcher.BeginInvoke(() => Shutdown());
+    internal void RequestShutdown() => Dispatcher.BeginInvoke(() =>
+    {
+        // Сторож не должен воскрешать приложение после осознанного выхода.
+        Watchdog.AllowShutdown();
+
+        // Экран блокировки отменяет закрытие окна, поэтому снимаем его до Shutdown,
+        // иначе процесс остаётся висеть.
+        _overlay?.Dispose();
+        _frame?.SetActive(false);
+
+        Shutdown();
+    });
 
     private void OpenConfig()
     {
@@ -227,13 +302,31 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_guardMode)
+        {
+            _guardCts?.Cancel();
+            _guardCts?.Dispose();
+            base.OnExit(e);
+            return;
+        }
+
         _ticker?.Stop();
         _persistTimer?.Stop();
         _panelTimer?.Stop();
+        _guardTimer?.Stop();
 
         if (_bank is not null) Persist();
 
-        _bot?.StopAsync().GetAwaiter().GetResult();
+        // Ждём бота ограниченно: зависшее сетевое ожидание не должно держать процесс.
+        try
+        {
+            _bot?.StopAsync().Wait(TimeSpan.FromSeconds(5));
+        }
+        catch
+        {
+            // Останавливаемся в любом случае.
+        }
+
         _bot?.Dispose();
         _overlay?.Dispose();
         _tray?.Dispose();
@@ -241,5 +334,8 @@ public partial class App : Application
         _singleInstance?.Dispose();
 
         base.OnExit(e);
+
+        // Страховка от чужих фоновых потоков, удерживающих процесс живым.
+        Environment.Exit(0);
     }
 }

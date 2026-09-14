@@ -48,6 +48,10 @@ internal sealed class AppConfig
     [JsonPropertyName("autostart")]
     public bool Autostart { get; set; } = true;
 
+    /// <summary>Держать сторожевой процесс, который поднимает приложение после снятия через диспетчер задач.</summary>
+    [JsonPropertyName("watchdogEnabled")]
+    public bool WatchdogEnabled { get; set; } = true;
+
     /// <summary>Спрашивать подтверждение перед любым изменением: временем, паузой, безлимитом, блокировкой.</summary>
     [JsonPropertyName("confirmActions")]
     public bool ConfirmActions { get; set; } = true;

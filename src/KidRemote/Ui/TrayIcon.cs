@@ -1,8 +1,8 @@
 ﻿using System.Drawing;
 using System.Drawing.Drawing2D;
+using KidRemote.Core;
 using Color = System.Drawing.Color;
 using Pen = System.Drawing.Pen;
-using KidRemote.Core;
 using Forms = System.Windows.Forms;
 
 namespace KidRemote.Ui;
@@ -15,7 +15,10 @@ internal sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
     private readonly Forms.ToolStripMenuItem _statusItem;
-    private Icon? _current;
+
+    private Icon? _currentIcon;
+    private IntPtr _currentHandle = IntPtr.Zero;
+    private Color _currentColor = Color.Empty;
 
     public event Action? ExitRequested;
     public event Action? OpenConfigRequested;
@@ -33,10 +36,32 @@ internal sealed class TrayIcon : IDisposable
         _icon = new Forms.NotifyIcon
         {
             Text = "KidRemote",
-            Visible = true,
             ContextMenuStrip = menu,
-            Icon = SystemIcons.Application
+            Icon = LoadBaseIcon()
         };
+
+        // Visible выставляем после назначения иконки: без неё оболочка иногда не создаёт значок.
+        _icon.Visible = true;
+    }
+
+    /// <summary>Иконка из ресурсов самого exe, с запасным вариантом на случай неудачи.</summary>
+    private static Icon LoadBaseIcon()
+    {
+        try
+        {
+            var path = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(path))
+            {
+                var extracted = Icon.ExtractAssociatedIcon(path);
+                if (extracted is not null) return extracted;
+            }
+        }
+        catch
+        {
+            // Ниже вернём системную.
+        }
+
+        return SystemIcons.Application;
     }
 
     public void Render(BankState state, long remainingSeconds)
@@ -50,12 +75,29 @@ internal sealed class TrayIcon : IDisposable
         };
 
         _statusItem.Text = caption;
-        _icon.Text = $"KidRemote — {caption}";
-        SwapIcon(color);
+
+        // Подсказка трея ограничена 63 символами, иначе NotifyIcon кидает исключение.
+        var tooltip = $"KidRemote — {caption}";
+        _icon.Text = tooltip.Length > 62 ? tooltip[..62] : tooltip;
+
+        if (color != _currentColor)
+        {
+            _currentColor = color;
+            SwapIcon(color);
+        }
     }
 
-    public void ShowMessage(string title, string text) =>
-        _icon.ShowBalloonTip(5000, title, text, Forms.ToolTipIcon.Info);
+    public void ShowMessage(string title, string text)
+    {
+        try
+        {
+            _icon.ShowBalloonTip(5000, title, text, Forms.ToolTipIcon.Info);
+        }
+        catch
+        {
+            // Уведомления могут быть отключены политиками.
+        }
+    }
 
     private static Color RunningColor(long remainingSeconds) => remainingSeconds switch
     {
@@ -66,39 +108,44 @@ internal sealed class TrayIcon : IDisposable
 
     private void SwapIcon(Color color)
     {
-        var previous = _current;
-
-        using var bitmap = new Bitmap(32, 32);
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var brush = new SolidBrush(color);
-            graphics.FillEllipse(brush, 3, 3, 26, 26);
-            using var pen = new Pen(Color.FromArgb(200, 0, 0, 0), 2);
-            graphics.DrawEllipse(pen, 3, 3, 26, 26);
-        }
-
-        var handle = bitmap.GetHicon();
         try
         {
-            _current = (Icon)Icon.FromHandle(handle).Clone();
-            _icon.Icon = _current;
-        }
-        finally
-        {
-            NativeDestroyIcon(handle);
-        }
+            using var bitmap = new Bitmap(32, 32);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var brush = new SolidBrush(color);
+                graphics.FillEllipse(brush, 3, 3, 26, 26);
+                using var pen = new Pen(Color.FromArgb(220, 10, 15, 30), 2.5f);
+                graphics.DrawEllipse(pen, 3, 3, 26, 26);
+            }
 
-        previous?.Dispose();
+            var handle = bitmap.GetHicon();
+            var previousIcon = _currentIcon;
+            var previousHandle = _currentHandle;
+
+            _currentIcon = Icon.FromHandle(handle);
+            _currentHandle = handle;
+            _icon.Icon = _currentIcon;
+
+            // Прежний хэндл освобождаем только после того, как оболочка приняла новый.
+            previousIcon?.Dispose();
+            if (previousHandle != IntPtr.Zero) DestroyIcon(previousHandle);
+        }
+        catch
+        {
+            // Значок важнее его цвета: при сбое отрисовки оставляем предыдущий.
+        }
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "DestroyIcon")]
-    private static extern bool NativeDestroyIcon(IntPtr handle);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool DestroyIcon(IntPtr handle);
 
     public void Dispose()
     {
         _icon.Visible = false;
         _icon.Dispose();
-        _current?.Dispose();
+        _currentIcon?.Dispose();
+        if (_currentHandle != IntPtr.Zero) DestroyIcon(_currentHandle);
     }
 }
