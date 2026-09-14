@@ -68,6 +68,8 @@ internal sealed partial class BotService : IDisposable
     {
         var backoff = TimeSpan.FromSeconds(1);
 
+        await _client.SetCommandsAsync(Keyboards.Commands(), ct).ConfigureAwait(false);
+
         // Первый запуск: пропускаем всё, что накопилось до установки, чтобы старые команды не сработали.
         if (_state.UpdateOffset == 0)
         {
@@ -147,6 +149,18 @@ internal sealed partial class BotService : IDisposable
             return;
         }
 
+        if (text == Keyboards.MenuButtonText)
+        {
+            await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        if (text == Keyboards.PauseButtonText)
+        {
+            await RequestAsync(chatId, "pause", 0, ct).ConfigureAwait(false);
+            return;
+        }
+
         if (TryParseBalanceEdit(text, out var seconds, out var absolute))
         {
             await RequestAsync(chatId, absolute ? "set" : seconds < 0 ? "sub" : "add", Math.Abs(seconds), ct).ConfigureAwait(false);
@@ -159,6 +173,11 @@ internal sealed partial class BotService : IDisposable
         switch (command)
         {
             case "/start":
+                await _client.SendMessageAsync(chatId, "Кнопки под полем ввода всегда под рукой.",
+                    Keyboards.Persistent(), ct).ConfigureAwait(false);
+                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                break;
+
             case "/menu":
             case "/status":
                 await SendPanelAsync(chatId, ct).ConfigureAwait(false);
@@ -222,7 +241,7 @@ internal sealed partial class BotService : IDisposable
             _config.AddParent(chatId);
             await _client.SendMessageAsync(chatId,
                 "Готово, этот чат привязан как родительский.\n\nВторого родителя добавьте кнопкой «👪 Родители».",
-                null, ct).ConfigureAwait(false);
+                Keyboards.Persistent(), ct).ConfigureAwait(false);
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
             return;
         }
@@ -235,7 +254,8 @@ internal sealed partial class BotService : IDisposable
         {
             _inviteCode = null;
             _config.AddParent(chatId);
-            await _client.SendMessageAsync(chatId, "Код принят. Теперь вы тоже можете управлять временем.", null, ct).ConfigureAwait(false);
+            await _client.SendMessageAsync(chatId, "Код принят. Теперь вы тоже можете управлять временем.",
+                Keyboards.Persistent(), ct).ConfigureAwait(false);
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
             await BroadcastAsync($"К управлению подключился ещё один родитель (chat id {chatId}).", chatId, ct).ConfigureAwait(false);
         }

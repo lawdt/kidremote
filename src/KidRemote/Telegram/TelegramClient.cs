@@ -46,7 +46,7 @@ internal sealed class TelegramClient : IDisposable
         return response?.Result ?? new List<Update>();
     }
 
-    public async Task<long?> SendMessageAsync(long chatId, string text, InlineKeyboardMarkup? markup, CancellationToken ct)
+    public async Task<long?> SendMessageAsync(long chatId, string text, object? markup, CancellationToken ct)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -105,6 +105,24 @@ internal sealed class TelegramClient : IDisposable
         catch
         {
             // Ответ на кнопку — косметика, молча пропускаем.
+        }
+    }
+
+    /// <summary>Список команд для стандартной кнопки «Меню» в интерфейсе Telegram.</summary>
+    public async Task SetCommandsAsync(IEnumerable<BotCommand> commands, CancellationToken ct)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["commands"] = commands.ToList()
+        };
+
+        try
+        {
+            await _http.PostAsJsonAsync(_baseUrl + "setMyCommands", payload, Json, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Меню — удобство, а не необходимость.
         }
     }
 

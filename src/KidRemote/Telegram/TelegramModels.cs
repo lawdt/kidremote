@@ -83,6 +83,39 @@ internal sealed class InlineKeyboardMarkup
     public List<List<InlineKeyboardButton>> InlineKeyboard { get; set; } = new();
 }
 
+/// <summary>Постоянная клавиатура под полем ввода.</summary>
+internal sealed class ReplyKeyboardMarkup
+{
+    [JsonPropertyName("keyboard")]
+    public List<List<KeyboardButton>> Keyboard { get; set; } = new();
+
+    [JsonPropertyName("resize_keyboard")]
+    public bool ResizeKeyboard { get; set; } = true;
+
+    [JsonPropertyName("is_persistent")]
+    public bool IsPersistent { get; set; } = true;
+}
+
+internal sealed class KeyboardButton
+{
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    public static KeyboardButton Create(string text) => new() { Text = text };
+}
+
+internal sealed class BotCommand
+{
+    [JsonPropertyName("command")]
+    public string Command { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    public static BotCommand Create(string command, string description) =>
+        new() { Command = command, Description = description };
+}
+
 internal sealed class InlineKeyboardButton
 {
     [JsonPropertyName("text")]

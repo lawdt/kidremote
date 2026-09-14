@@ -62,6 +62,40 @@ internal static class Keyboards
         return new InlineKeyboardMarkup { InlineKeyboard = rows };
     }
 
+    /// <summary>Постоянные кнопки под полем ввода — быстрый доступ к панели.</summary>
+    public static ReplyKeyboardMarkup Persistent()
+    {
+        return new ReplyKeyboardMarkup
+        {
+            Keyboard = new List<List<KeyboardButton>>
+            {
+                new()
+                {
+                    KeyboardButton.Create(MenuButtonText),
+                    KeyboardButton.Create(PauseButtonText)
+                }
+            }
+        };
+    }
+
+    public const string MenuButtonText = "📋 Меню";
+    public const string PauseButtonText = "⏸ Пауза";
+
+    /// <summary>Команды для стандартной кнопки «Меню» рядом с полем ввода.</summary>
+    public static IEnumerable<BotCommand> Commands() => new[]
+    {
+        BotCommand.Create("menu", "Панель управления"),
+        BotCommand.Create("status", "Сколько времени осталось"),
+        BotCommand.Create("pause", "Пауза: экран заблокировать, время сохранить"),
+        BotCommand.Create("resume", "Снять паузу"),
+        BotCommand.Create("free", "Безлимит до отмены"),
+        BotCommand.Create("limit", "Вернуть лимит"),
+        BotCommand.Create("lock", "Заблокировать сейчас"),
+        BotCommand.Create("invite", "Код для второго родителя"),
+        BotCommand.Create("help", "Все команды"),
+        BotCommand.Create("quit", "Закрыть приложение на компьютере")
+    };
+
     /// <summary>Короткие добавки в сообщении о том, что время кончилось.</summary>
     public static InlineKeyboardMarkup QuickAdd()
     {
