@@ -90,9 +90,10 @@ public partial class App : Application
 
         _frame = new AlertFrameWindow();
 
-        _tray = new TrayIcon();
+        _tray = new TrayIcon(_config.CountdownMode);
         _tray.OpenConfigRequested += OpenConfig;
         _tray.ExitRequested += ExitByPassword;
+        _tray.CountdownModeChanged += OnCountdownModeChanged;
 
         _hotkey = new HotkeyListener();
         _hotkey.Pressed += OnUnlockHotkey;
@@ -198,8 +199,16 @@ public partial class App : Application
         else
         {
             _overlay.Hide();
-            if (!_countdown.IsVisible) _countdown.Show();
-            _countdown.Render(state, remaining, snapshot.ShouldConsume, valueChanged);
+
+            if (ShouldShowCountdown(state, remaining))
+            {
+                if (!_countdown.IsVisible) _countdown.Show();
+                _countdown.Render(state, remaining, snapshot.ShouldConsume, valueChanged);
+            }
+            else if (_countdown.IsVisible)
+            {
+                _countdown.Hide();
+            }
         }
 
         if (valueChanged && state == BankState.Running && snapshot.ShouldConsume)
@@ -218,6 +227,21 @@ public partial class App : Application
             _ = _bot.NotifyAsync($"⏳ У ребёнка осталось {TimeFormat.Human(remaining)}.");
 
         _lastRenderedSeconds = remaining;
+    }
+
+    private bool ShouldShowCountdown(BankState state, long remaining) => _config.CountdownMode switch
+    {
+        CountdownMode.Never => false,
+        // На последней минуте плашка важнее всего, в остальное время не мозолит глаза.
+        CountdownMode.LastMinute => state == BankState.Running && remaining > 0 && remaining <= _config.DangerSeconds,
+        _ => true
+    };
+
+    private void OnCountdownModeChanged(CountdownMode mode)
+    {
+        _config.CountdownMode = mode;
+        _config.Save();
+        RenderAll(force: true);
     }
 
     /// <summary>

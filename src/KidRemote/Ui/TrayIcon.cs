@@ -15,6 +15,7 @@ internal sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
     private readonly Forms.ToolStripMenuItem _statusItem;
+    private readonly Dictionary<CountdownMode, Forms.ToolStripMenuItem> _countdownItems = new();
 
     private Icon? _currentIcon;
     private IntPtr _currentHandle = IntPtr.Zero;
@@ -22,13 +23,22 @@ internal sealed class TrayIcon : IDisposable
 
     public event Action? OpenConfigRequested;
     public event Action? ExitRequested;
+    public event Action<CountdownMode>? CountdownModeChanged;
 
-    public TrayIcon()
+    public TrayIcon(CountdownMode countdownMode)
     {
         _statusItem = new Forms.ToolStripMenuItem("Загрузка…") { Enabled = false };
 
+        var countdownMenu = new Forms.ToolStripMenuItem("Таймер на экране");
+        AddCountdownOption(countdownMenu, CountdownMode.Always, "Показывать");
+        AddCountdownOption(countdownMenu, CountdownMode.LastMinute, "Только последнюю минуту");
+        AddCountdownOption(countdownMenu, CountdownMode.Never, "Не показывать");
+        MarkCountdownMode(countdownMode);
+
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(_statusItem);
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add(countdownMenu);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Открыть настройки…", null, (_, _) => OpenConfigRequested?.Invoke());
         menu.Items.Add("Выход…", null, (_, _) => ExitRequested?.Invoke());
@@ -42,6 +52,23 @@ internal sealed class TrayIcon : IDisposable
 
         // Visible выставляем после назначения иконки: без неё оболочка иногда не создаёт значок.
         _icon.Visible = true;
+    }
+
+    private void AddCountdownOption(Forms.ToolStripMenuItem parent, CountdownMode mode, string caption)
+    {
+        var item = new Forms.ToolStripMenuItem(caption, null, (_, _) =>
+        {
+            MarkCountdownMode(mode);
+            CountdownModeChanged?.Invoke(mode);
+        });
+
+        _countdownItems[mode] = item;
+        parent.DropDownItems.Add(item);
+    }
+
+    private void MarkCountdownMode(CountdownMode mode)
+    {
+        foreach (var (key, item) in _countdownItems) item.Checked = key == mode;
     }
 
     /// <summary>Иконка из ресурсов самого exe, с запасным вариантом на случай неудачи.</summary>

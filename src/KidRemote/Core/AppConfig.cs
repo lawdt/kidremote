@@ -33,6 +33,11 @@ internal sealed class AppConfig
     [JsonPropertyName("dangerSeconds")]
     public int DangerSeconds { get; set; } = 60;
 
+    /// <summary>Когда показывать плашку отсчёта: Always, Never, LastMinute.</summary>
+    [JsonPropertyName("countdownMode")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public CountdownMode CountdownMode { get; set; } = CountdownMode.Always;
+
     /// <summary>Угол экрана для плашки: TopRight, TopLeft, BottomRight, BottomLeft.</summary>
     [JsonPropertyName("overlayCorner")]
     public string OverlayCorner { get; set; } = "TopRight";
