@@ -17,7 +17,7 @@ internal sealed partial class BotService : IDisposable
     /// <summary>Черновик точного значения: сколько минут набрано и что с ними сделать.</summary>
     private sealed class Draft
     {
-        public int Minutes { get; set; } = 15;
+        public int Minutes { get; set; }
         public DraftMode Mode { get; set; } = DraftMode.Add;
     }
 
@@ -315,6 +315,7 @@ internal sealed partial class BotService : IDisposable
 
             case "draft":
             {
+                _drafts[chatId] = new Draft();
                 await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
                 await ShowDraftAsync(chatId, messageId, ct).ConfigureAwait(false);
                 return;
