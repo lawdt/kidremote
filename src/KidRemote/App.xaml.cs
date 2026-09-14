@@ -92,6 +92,7 @@ public partial class App : Application
 
         _tray = new TrayIcon();
         _tray.OpenConfigRequested += OpenConfig;
+        _tray.ExitRequested += ExitByPassword;
 
         _hotkey = new HotkeyListener();
         _hotkey.Pressed += OnUnlockHotkey;
@@ -290,21 +291,12 @@ public partial class App : Application
     /// </summary>
     private void OnUnlockHotkey()
     {
-        if (!_config.HasPassword)
-        {
-            _tray.ShowMessage("KidRemote", "Сначала задайте пароль в боте: /password ваш_пароль");
-            return;
-        }
+        if (!AskPassword("Разблокировка компьютера. Введите родительский пароль.")) return;
 
         _overlay.SuspendGuard();
 
         try
         {
-            var prompt = new PasswordWindow("Разблокировка компьютера. Введите родительский пароль.",
-                _config.VerifyPassword);
-
-            if (prompt.ShowDialog() != true) return;
-
             var unlock = new UnlockWindow(_bank.RemainingSeconds);
             if (unlock.ShowDialog() != true) return;
 
@@ -326,20 +318,47 @@ public partial class App : Application
     /// <summary>Настройки из трея открываются только по родительскому паролю.</summary>
     private void OpenConfig()
     {
+        if (!AskPassword("Введите родительский пароль, чтобы открыть файл настроек.")) return;
+        OpenConfigFile();
+    }
+
+    /// <summary>Выход из трея тоже под паролем: иначе защита снимается одним кликом.</summary>
+    private void ExitByPassword()
+    {
+        if (!AskPassword("Введите родительский пароль, чтобы закрыть KidRemote.")) return;
+
+        // Даём уведомлению шанс уйти до того, как процесс завершится.
+        try
+        {
+            _bot.NotifyAsync("🚪 KidRemote закрыт с компьютера.").Wait(TimeSpan.FromSeconds(3));
+        }
+        catch
+        {
+            // Нет сети — выходим всё равно.
+        }
+
+        RequestShutdown();
+    }
+
+    private bool AskPassword(string caption)
+    {
         if (!_config.HasPassword)
         {
             _tray.ShowMessage("KidRemote",
-                "Настройки закрыты. Сначала задайте пароль в боте: /password ваш_пароль");
-            return;
+                "Сначала задайте пароль в боте: /password ваш_пароль");
+            return false;
         }
 
-        var prompt = new PasswordWindow(
-            "Введите родительский пароль, чтобы открыть файл настроек.",
-            _config.VerifyPassword);
+        _overlay.SuspendGuard();
 
-        if (prompt.ShowDialog() != true) return;
-
-        OpenConfigFile();
+        try
+        {
+            return new PasswordWindow(caption, _config.VerifyPassword).ShowDialog() == true;
+        }
+        finally
+        {
+            _overlay.ResumeGuard();
+        }
     }
 
     private void OpenConfigFile()

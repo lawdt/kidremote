@@ -57,7 +57,7 @@ internal sealed class PasswordWindow : Window
         var cancel = new Button { Content = "Отмена", Width = 96, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
         cancel.Click += (_, _) => { DialogResult = false; };
 
-        var ok = new Button { Content = "Открыть", Width = 96, Height = 30, IsDefault = true };
+        var ok = new Button { Content = "ОК", Width = 96, Height = 30, IsDefault = true };
         ok.Click += (_, _) => Submit();
 
         buttons.Children.Add(cancel);
