@@ -9,9 +9,6 @@ internal sealed class PersistedState
     [JsonPropertyName("remainingSeconds")]
     public long RemainingSeconds { get; set; }
 
-    [JsonPropertyName("paused")]
-    public bool Paused { get; set; }
-
     [JsonPropertyName("unlimited")]
     public bool Unlimited { get; set; }
 

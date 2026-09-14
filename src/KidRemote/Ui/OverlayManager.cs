@@ -20,7 +20,6 @@ internal sealed class OverlayManager : IDisposable
 
     private bool _visible;
     private string _phrase = string.Empty;
-    private BankState _state = BankState.Locked;
 
     public OverlayManager(AppConfig config)
     {
@@ -34,16 +33,11 @@ internal sealed class OverlayManager : IDisposable
 
     public bool IsVisible => _visible;
 
-    public void Show(BankState state)
+    public void Show()
     {
-        if (_visible)
-        {
-            Update(state);
-            return;
-        }
+        if (_visible) return;
 
         _visible = true;
-        _state = state;
 
         // Новая фраза на каждую блокировку.
         _phrase = Motivation.Next();
@@ -62,21 +56,13 @@ internal sealed class OverlayManager : IDisposable
             var window = new LockOverlayWindow();
             window.Show();
             window.BindToScreen(screen);
-            window.Render(state, _phrase);
+            window.Render(_phrase);
             _windows.Add(window);
         }
 
         if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
         _keepOnTop.Start();
         Reassert();
-    }
-
-    public void Update(BankState state)
-    {
-        if (!_visible) return;
-
-        _state = state;
-        foreach (var window in _windows) window.Render(state, _phrase);
     }
 
     /// <summary>

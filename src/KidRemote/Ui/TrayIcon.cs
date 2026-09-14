@@ -69,7 +69,6 @@ internal sealed class TrayIcon : IDisposable
         var (color, caption) = state switch
         {
             BankState.Unlimited => (Color.FromArgb(0x40, 0xC4, 0xFF), "Безлимит"),
-            BankState.Paused => (Color.FromArgb(0x9E, 0x9E, 0x9E), $"Пауза · {TimeFormat.Compact(remainingSeconds)}"),
             BankState.Locked => (Color.FromArgb(0xFF, 0x17, 0x44), "Время вышло"),
             _ => (RunningColor(remainingSeconds), $"Осталось {TimeFormat.Compact(remainingSeconds)}")
         };

@@ -155,12 +155,6 @@ internal sealed partial class BotService : IDisposable
             return;
         }
 
-        if (text == Keyboards.PauseButtonText)
-        {
-            await RequestAsync(chatId, "pause", 0, ct).ConfigureAwait(false);
-            return;
-        }
-
         if (TryParseBalanceEdit(text, out var seconds, out var absolute))
         {
             await RequestAsync(chatId, absolute ? "set" : seconds < 0 ? "sub" : "add", Math.Abs(seconds), ct).ConfigureAwait(false);
@@ -193,14 +187,6 @@ internal sealed partial class BotService : IDisposable
 
             case "/set" when TryParseDuration(argument, out var set):
                 await RequestAsync(chatId, "set", set, ct).ConfigureAwait(false);
-                break;
-
-            case "/pause":
-                await RequestAsync(chatId, "pause", 0, ct).ConfigureAwait(false);
-                break;
-
-            case "/resume":
-                await RequestAsync(chatId, "resume", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/free":
@@ -482,12 +468,6 @@ internal sealed partial class BotService : IDisposable
             case "set":
                 _bank.Set(argument);
                 return $"Выставлено {TimeFormat.Human(argument)}";
-            case "pause":
-                _bank.SetPaused(true);
-                return "Пауза";
-            case "resume":
-                _bank.SetPaused(false);
-                return "Продолжаем";
             case "free":
                 _bank.SetUnlimited(true);
                 return "Безлимит включён";
@@ -586,21 +566,14 @@ internal sealed partial class BotService : IDisposable
                 sb.AppendLine($"Сейчас {TimeFormat.Compact(remaining)}");
                 if (unlimited) sb.AppendLine("Безлимит отключится, вернётся обычный отсчёт.");
                 break;
-            case "pause":
-                sb.AppendLine("Поставить на паузу?");
-                sb.AppendLine("Экран заблокируется, остаток расходоваться не будет.");
-                break;
-            case "resume":
-                sb.AppendLine("Снять паузу?");
-                sb.AppendLine($"Останется {TimeFormat.Human(remaining)}.");
-                break;
             case "free":
                 sb.AppendLine("Включить безлимит?");
                 sb.AppendLine("Блокировки не будет, пока не отмените.");
+                if (remaining > 0) sb.AppendLine($"Текущий остаток {TimeFormat.Human(remaining)} сгорит.");
                 break;
             case "unfree":
                 sb.AppendLine("Вернуть лимит?");
-                sb.AppendLine($"Останется {TimeFormat.Human(remaining)}.");
+                sb.AppendLine("Компьютер заблокируется сразу — время выдаётся заново.");
                 break;
             case "lock":
                 sb.AppendLine("Заблокировать прямо сейчас?");
@@ -798,12 +771,7 @@ internal sealed partial class BotService : IDisposable
         {
             case BankState.Unlimited:
                 sb.AppendLine("♾ Безлимит — блокировки нет");
-                sb.AppendLine($"Остаток в запасе: {TimeFormat.Compact(_bank.RemainingSeconds)}");
                 sb.AppendLine("Выдача времени вернёт обычный отсчёт.");
-                break;
-            case BankState.Paused:
-                sb.AppendLine("⏸ Пауза — экран заблокирован, время не расходуется");
-                sb.AppendLine($"⏳ Осталось: <b>{TimeFormat.Compact(_bank.RemainingSeconds)}</b>");
                 break;
             case BankState.Locked:
                 sb.AppendLine("🔒 Время вышло — экран заблокирован");
@@ -906,7 +874,6 @@ internal sealed partial class BotService : IDisposable
         "<code>+1:30</code> — добавить час тридцать\n" +
         "<code>-15</code> — списать 15 минут\n" +
         "<code>=45</code> — выставить ровно 45 минут\n" +
-        "/pause, /resume — пауза и продолжение\n" +
         "/free, /limit — безлимит и возврат к лимиту\n" +
         "/lock — заблокировать сейчас\n" +
         "/menu — панель с кнопками\n" +

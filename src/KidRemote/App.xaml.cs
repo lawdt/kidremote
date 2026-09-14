@@ -79,7 +79,7 @@ public partial class App : Application
         _state = _store.Load();
 
         _bank = new TimeBank();
-        _bank.Restore(_state.RemainingSeconds, _state.Paused, _state.Unlimited);
+        _bank.Restore(_state.RemainingSeconds, _state.Unlimited);
         _bank.Changed += OnBankChanged;
 
         _activity = new ActivityMonitor(_config);
@@ -184,7 +184,7 @@ public partial class App : Application
         if (!force && !valueChanged && !stateChanged && !consumingChanged) return;
         _lastConsuming = snapshot.ShouldConsume;
 
-        var blocked = state is BankState.Locked or BankState.Paused;
+        var blocked = state == BankState.Locked;
         var danger = _config.AlarmsEnabled && state == BankState.Running && snapshot.ShouldConsume
                      && remaining > 0 && remaining <= _config.DangerSeconds;
 
@@ -192,7 +192,7 @@ public partial class App : Application
 
         if (blocked)
         {
-            _overlay.Show(state);
+            _overlay.Show();
             if (_countdown.IsVisible) _countdown.Hide();
         }
         else
@@ -267,7 +267,6 @@ public partial class App : Application
     private void Persist()
     {
         _state.RemainingSeconds = _bank.RemainingSeconds;
-        _state.Paused = _bank.IsPaused;
         _state.Unlimited = _bank.IsUnlimited;
         _store.Save(_state);
     }
@@ -302,8 +301,6 @@ public partial class App : Application
 
             if (unlock.Unlimited) _bank.SetUnlimited(true);
             else _bank.Add(unlock.Seconds);
-
-            if (_bank.IsPaused) _bank.SetPaused(false);
 
             Persist();
             _ = _bot.RefreshPanelsAsync(force: true);

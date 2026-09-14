@@ -8,9 +8,6 @@ internal enum BankState
     /// <summary>Есть баланс, блокировки нет.</summary>
     Running,
 
-    /// <summary>Пауза от родителя: экран заблокирован, баланс не расходуется.</summary>
-    Paused,
-
     /// <summary>Безлимит до отмены.</summary>
     Unlimited
 }
@@ -23,7 +20,6 @@ internal sealed class TimeBank
 {
     private readonly object _sync = new();
     private long _remainingSeconds;
-    private bool _paused;
     private bool _unlimited;
     private double _carry;
 
@@ -32,11 +28,6 @@ internal sealed class TimeBank
     public long RemainingSeconds
     {
         get { lock (_sync) return _remainingSeconds; }
-    }
-
-    public bool IsPaused
-    {
-        get { lock (_sync) return _paused; }
     }
 
     public bool IsUnlimited
@@ -51,18 +42,16 @@ internal sealed class TimeBank
             lock (_sync)
             {
                 if (_unlimited) return BankState.Unlimited;
-                if (_paused) return BankState.Paused;
                 return _remainingSeconds > 0 ? BankState.Running : BankState.Locked;
             }
         }
     }
 
-    public void Restore(long remainingSeconds, bool paused, bool unlimited)
+    public void Restore(long remainingSeconds, bool unlimited)
     {
         lock (_sync)
         {
             _remainingSeconds = Math.Max(0, remainingSeconds);
-            _paused = paused;
             _unlimited = unlimited;
             _carry = 0;
         }
@@ -82,7 +71,7 @@ internal sealed class TimeBank
 
         lock (_sync)
         {
-            if (_unlimited || _paused || _remainingSeconds <= 0) return;
+            if (_unlimited || _remainingSeconds <= 0) return;
 
             _carry += elapsedSeconds;
             var whole = (long)_carry;
@@ -128,23 +117,16 @@ internal sealed class TimeBank
         Changed?.Invoke();
     }
 
-    public void SetPaused(bool paused)
-    {
-        lock (_sync)
-        {
-            _paused = paused;
-            _carry = 0;
-        }
-
-        Changed?.Invoke();
-    }
-
+    /// <summary>
+    /// Включение безлимита обнуляет отсчёт: время больше не считается, и возвращаться
+    /// к старому остатку после отмены незачем — он выдаётся заново.
+    /// </summary>
     public void SetUnlimited(bool unlimited)
     {
         lock (_sync)
         {
             _unlimited = unlimited;
-            if (unlimited) _paused = false;
+            if (unlimited) _remainingSeconds = 0;
             _carry = 0;
         }
 
@@ -158,7 +140,6 @@ internal sealed class TimeBank
         {
             _remainingSeconds = 0;
             _unlimited = false;
-            _paused = false;
             _carry = 0;
         }
 

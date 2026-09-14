@@ -2,7 +2,6 @@
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
-using KidRemote.Core;
 using KidRemote.Interop;
 using Forms = System.Windows.Forms;
 
@@ -32,22 +31,12 @@ public partial class LockOverlayWindow : Window
         Height = bounds.Height / scaleY;
     }
 
-    internal void Render(BankState state, string phrase)
+    internal void Render(string phrase)
     {
-        if (state == BankState.Paused)
-        {
-            Glyph.Text = "⏸";
-            Headline.Text = "Перерыв";
-            Subtitle.Text = "Время на паузе и не расходуется";
-            Subtitle.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            // На экране блокировки вместо констатации факта — фраза, ради которой стоит встать.
-            Glyph.Text = "🔒";
-            Headline.Text = phrase;
-            Subtitle.Visibility = Visibility.Collapsed;
-        }
+        // Вместо констатации факта — фраза, ради которой стоит встать.
+        Glyph.Text = "🔒";
+        Headline.Text = phrase;
+        Subtitle.Visibility = Visibility.Collapsed;
 
         FadeIn();
     }

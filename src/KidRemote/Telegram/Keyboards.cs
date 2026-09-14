@@ -35,17 +35,14 @@ internal static class Keyboards
             }
         };
 
-        var modes = new List<InlineKeyboardButton>
+        // В безлимите кнопка не нужна: выход из него — выдача времени или блокировка.
+        if (state != BankState.Unlimited)
         {
-            state == BankState.Paused
-                ? InlineKeyboardButton.Create("▶️ Продолжить", "ask:resume")
-                : InlineKeyboardButton.Create("⏸ Пауза", "ask:pause"),
-            state == BankState.Unlimited
-                ? InlineKeyboardButton.Create("⏱ Вернуть лимит", "ask:unfree")
-                : InlineKeyboardButton.Create("♾ Безлимит", "ask:free")
-        };
-
-        rows.Add(modes);
+            rows.Add(new List<InlineKeyboardButton>
+            {
+                InlineKeyboardButton.Create("♾ Безлимит", "ask:free")
+            });
+        }
 
         rows.Add(new List<InlineKeyboardButton>
         {
@@ -69,25 +66,18 @@ internal static class Keyboards
         {
             Keyboard = new List<List<KeyboardButton>>
             {
-                new()
-                {
-                    KeyboardButton.Create(MenuButtonText),
-                    KeyboardButton.Create(PauseButtonText)
-                }
+                new() { KeyboardButton.Create(MenuButtonText) }
             }
         };
     }
 
     public const string MenuButtonText = "📋 Меню";
-    public const string PauseButtonText = "⏸ Пауза";
 
     /// <summary>Команды для стандартной кнопки «Меню» рядом с полем ввода.</summary>
     public static IEnumerable<BotCommand> Commands() => new[]
     {
         BotCommand.Create("menu", "Панель управления"),
         BotCommand.Create("status", "Сколько времени осталось"),
-        BotCommand.Create("pause", "Пауза: экран заблокировать, время сохранить"),
-        BotCommand.Create("resume", "Снять паузу"),
         BotCommand.Create("free", "Безлимит до отмены"),
         BotCommand.Create("limit", "Вернуть лимит"),
         BotCommand.Create("lock", "Заблокировать сейчас"),
