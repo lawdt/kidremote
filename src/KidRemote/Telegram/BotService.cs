@@ -566,6 +566,7 @@ internal sealed partial class BotService : IDisposable
     private string BuildConfirmText(string kind, long argument)
     {
         var remaining = _bank.RemainingSeconds;
+        var unlimited = _bank.IsUnlimited;
         var sb = new StringBuilder();
 
         switch (kind)
@@ -573,14 +574,17 @@ internal sealed partial class BotService : IDisposable
             case "add":
                 sb.AppendLine($"Добавить <b>{TimeFormat.Human(argument)}</b>?");
                 sb.AppendLine($"Было {TimeFormat.Compact(remaining)} → станет {TimeFormat.Compact(remaining + argument)}");
+                if (unlimited) sb.AppendLine("Безлимит отключится, вернётся обычный отсчёт.");
                 break;
             case "sub":
                 sb.AppendLine($"Списать <b>{TimeFormat.Human(argument)}</b>?");
                 sb.AppendLine($"Было {TimeFormat.Compact(remaining)} → станет {TimeFormat.Compact(Math.Max(0, remaining - argument))}");
+                if (unlimited) sb.AppendLine("Безлимит отключится, вернётся обычный отсчёт.");
                 break;
             case "set":
                 sb.AppendLine($"Выставить ровно <b>{TimeFormat.Human(argument)}</b>?");
                 sb.AppendLine($"Сейчас {TimeFormat.Compact(remaining)}");
+                if (unlimited) sb.AppendLine("Безлимит отключится, вернётся обычный отсчёт.");
                 break;
             case "pause":
                 sb.AppendLine("Поставить на паузу?");
@@ -794,6 +798,8 @@ internal sealed partial class BotService : IDisposable
         {
             case BankState.Unlimited:
                 sb.AppendLine("♾ Безлимит — блокировки нет");
+                sb.AppendLine($"Остаток в запасе: {TimeFormat.Compact(_bank.RemainingSeconds)}");
+                sb.AppendLine("Выдача времени вернёт обычный отсчёт.");
                 break;
             case BankState.Paused:
                 sb.AppendLine("⏸ Пауза — экран заблокирован, время не расходуется");

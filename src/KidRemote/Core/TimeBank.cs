@@ -100,11 +100,16 @@ internal sealed class TimeBank
         if (changed) Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Выдача времени выводит из безлимита: раз назначили конкретные минуты,
+    /// значит вернулись к обычному режиму с отсчётом.
+    /// </summary>
     public void Add(long seconds)
     {
         lock (_sync)
         {
             _remainingSeconds = Math.Max(0, _remainingSeconds + seconds);
+            _unlimited = false;
             _carry = 0;
         }
 
@@ -116,6 +121,7 @@ internal sealed class TimeBank
         lock (_sync)
         {
             _remainingSeconds = Math.Max(0, seconds);
+            _unlimited = false;
             _carry = 0;
         }
 
