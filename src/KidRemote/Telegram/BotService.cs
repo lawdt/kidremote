@@ -444,8 +444,10 @@ internal sealed partial class BotService : IDisposable
 
             case "invite":
             {
-                await _client.SendMessageAsync(chatId, BuildInviteText(), null, ct).ConfigureAwait(false);
-                await _client.AnswerCallbackAsync(callback.Id, "Код отправлен", ct).ConfigureAwait(false);
+                var sent = await _client.SendMessageAsync(chatId, BuildInviteText(), null, ct).ConfigureAwait(false);
+                await _client.AnswerCallbackAsync(callback.Id,
+                    sent is null ? "Не удалось отправить код, смотрите журнал" : "Код отправлен",
+                    ct).ConfigureAwait(false);
                 return;
             }
 

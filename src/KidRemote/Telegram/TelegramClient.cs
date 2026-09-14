@@ -1,6 +1,7 @@
 ﻿using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using KidRemote.Core;
 
 namespace KidRemote.Telegram;
 
@@ -48,81 +49,82 @@ internal sealed class TelegramClient : IDisposable
 
     public async Task<long?> SendMessageAsync(long chatId, string text, object? markup, CancellationToken ct)
     {
-        var payload = new Dictionary<string, object?>
+        var payload = new Dictionary<string, object>
         {
             ["chat_id"] = chatId,
             ["text"] = text,
-            ["parse_mode"] = "HTML",
-            ["reply_markup"] = markup
+            ["parse_mode"] = "HTML"
         };
 
-        try
-        {
-            var response = await _http.PostAsJsonAsync(_baseUrl + "sendMessage", payload, Json, ct).ConfigureAwait(false);
-            var parsed = await response.Content.ReadFromJsonAsync<ApiResponse<Message>>(Json, ct).ConfigureAwait(false);
-            return parsed?.Result?.MessageId;
-        }
-        catch
-        {
-            return null;
-        }
+        // Пустую разметку не отправляем вовсе: reply_markup со значением null Telegram отвергает.
+        if (markup is not null) payload["reply_markup"] = markup;
+
+        var result = await PostAsync<Message>("sendMessage", payload, ct).ConfigureAwait(false);
+        return result?.MessageId;
     }
 
     public async Task<bool> EditMessageAsync(long chatId, long messageId, string text, InlineKeyboardMarkup? markup, CancellationToken ct)
     {
-        var payload = new Dictionary<string, object?>
+        var payload = new Dictionary<string, object>
         {
             ["chat_id"] = chatId,
             ["message_id"] = messageId,
             ["text"] = text,
-            ["parse_mode"] = "HTML",
-            ["reply_markup"] = markup
+            ["parse_mode"] = "HTML"
         };
 
-        try
-        {
-            var response = await _http.PostAsJsonAsync(_baseUrl + "editMessageText", payload, Json, ct).ConfigureAwait(false);
-            return response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            return false;
-        }
+        if (markup is not null) payload["reply_markup"] = markup;
+
+        return await PostAsync<Message>("editMessageText", payload, ct).ConfigureAwait(false) is not null;
     }
 
     public async Task AnswerCallbackAsync(string callbackId, string? text, CancellationToken ct)
     {
-        var payload = new Dictionary<string, object?>
+        var payload = new Dictionary<string, object>
         {
-            ["callback_query_id"] = callbackId,
-            ["text"] = text
+            ["callback_query_id"] = callbackId
         };
 
-        try
-        {
-            await _http.PostAsJsonAsync(_baseUrl + "answerCallbackQuery", payload, Json, ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Ответ на кнопку — косметика, молча пропускаем.
-        }
+        if (!string.IsNullOrEmpty(text)) payload["text"] = text;
+
+        await PostAsync<bool>("answerCallbackQuery", payload, ct).ConfigureAwait(false);
     }
 
     /// <summary>Список команд для стандартной кнопки «Меню» в интерфейсе Telegram.</summary>
     public async Task SetCommandsAsync(IEnumerable<BotCommand> commands, CancellationToken ct)
     {
-        var payload = new Dictionary<string, object?>
+        var payload = new Dictionary<string, object>
         {
             ["commands"] = commands.ToList()
         };
 
+        await PostAsync<bool>("setMyCommands", payload, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Единая точка вызова API: ошибки не теряются молча, а попадают в журнал —
+    /// иначе неудачная отправка выглядит просто как «бот ничего не прислал».
+    /// </summary>
+    private async Task<T?> PostAsync<T>(string method, Dictionary<string, object> payload, CancellationToken ct)
+    {
         try
         {
-            await _http.PostAsJsonAsync(_baseUrl + "setMyCommands", payload, Json, ct).ConfigureAwait(false);
+            var response = await _http.PostAsJsonAsync(_baseUrl + method, payload, Json, ct).ConfigureAwait(false);
+            var parsed = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(Json, ct).ConfigureAwait(false);
+
+            if (parsed is { Ok: true }) return parsed.Result;
+
+            Log.Write($"telegram {method}: {(int)response.StatusCode} {parsed?.Description ?? "без описания"}");
+            return default;
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // Меню — удобство, а не необходимость.
+            return default;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"telegram {method}: {ex.GetType().Name} {ex.Message}");
+            return default;
         }
     }
 
