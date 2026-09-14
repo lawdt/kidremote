@@ -617,6 +617,12 @@ internal sealed partial class BotService : IDisposable
                 break;
         }
 
+        if (_bank.IsUnlimited)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Сейчас безлимит — он отключится, как только выдадите время.");
+        }
+
         return sb.ToString().TrimEnd();
     }
 

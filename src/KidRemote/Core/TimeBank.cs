@@ -51,7 +51,8 @@ internal sealed class TimeBank
     {
         lock (_sync)
         {
-            _remainingSeconds = Math.Max(0, remainingSeconds);
+            // В безлимите остатка быть не должно. Состояние из прежних версий приводим к тому же виду.
+            _remainingSeconds = unlimited ? 0 : Math.Max(0, remainingSeconds);
             _unlimited = unlimited;
             _carry = 0;
         }
