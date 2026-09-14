@@ -1,0 +1,32 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore KidRemote.sln
+
+      - name: Build
+        run: dotnet build KidRemote.sln -c Release --no-restore
+
+      - name: Publish
+        run: dotnet publish src/KidRemote/KidRemote.csproj -c Release -o publish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KidRemote
+          path: publish/KidRemote.exe
