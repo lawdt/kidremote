@@ -14,6 +14,9 @@ public partial class App : Application
     /// <summary>Разрыв между тиками больше этого — значит был сон или зависание, время не списываем.</summary>
     private const double MaxTrustedDeltaSeconds = 2.0;
 
+    /// <summary>Последние секунды отсчитываются посекундно.</summary>
+    private const long FinalCountdownSeconds = 10;
+
     private Mutex? _singleInstance;
     private CancellationTokenSource? _guardCts;
     private bool _guardMode;
@@ -213,10 +216,20 @@ public partial class App : Application
         _lastRenderedSeconds = remaining;
     }
 
-    /// <summary>Звук и вспышка рамки: последняя минута — каждые 10 секунд, до неё — на каждой минуте.</summary>
+    /// <summary>
+    /// Звук и вспышка рамки: последние 10 секунд — каждую секунду, до этого в красной зоне —
+    /// раз в 10 секунд, в жёлтой — на каждой минуте.
+    /// </summary>
     private void Signal(long remaining)
     {
         if (remaining <= 0) return;
+
+        if (remaining <= FinalCountdownSeconds)
+        {
+            Alarm.LastMinute();
+            _frame.Flash();
+            return;
+        }
 
         if (remaining <= _config.DangerSeconds)
         {
