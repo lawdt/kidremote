@@ -11,7 +11,18 @@ namespace KidRemote.Telegram;
 internal sealed partial class BotService : IDisposable
 {
     private const int PollTimeoutSeconds = 30;
+    private const int MaxDraftMinutes = 600;
     private static readonly TimeSpan InviteLifetime = TimeSpan.FromMinutes(15);
+
+    /// <summary>Черновик точного значения: сколько минут набрано и что с ними сделать.</summary>
+    private sealed class Draft
+    {
+        public int Minutes { get; set; } = 15;
+        public bool Absolute { get; set; }
+    }
+
+    /// <summary>Родитель попросил закрыть приложение командой /quit.</summary>
+    public event Action? ShutdownRequested;
 
     private readonly AppConfig _config;
     private readonly TimeBank _bank;
@@ -20,9 +31,11 @@ internal sealed partial class BotService : IDisposable
     private readonly Func<ActivitySnapshot> _activity;
     private readonly TelegramClient _client;
     private readonly CancellationTokenSource _cts = new();
+    private readonly Dictionary<long, Draft> _drafts = new();
 
-    /// <summary>Родитель попросил закрыть приложение командой /quit.</summary>
-    public event Action? ShutdownRequested;
+    /// <summary>Чаты, где сейчас открыт экран подтверждения или настройки: их нельзя затирать автообновлением.</summary>
+    private readonly HashSet<long> _busyChats = new();
+    private readonly object _busySync = new();
 
     private Task? _loop;
     private string _lastPanelText = string.Empty;
@@ -134,12 +147,9 @@ internal sealed partial class BotService : IDisposable
             return;
         }
 
-        if (TryParseBalanceEdit(text, out var deltaSeconds, out var absolute))
+        if (TryParseBalanceEdit(text, out var seconds, out var absolute))
         {
-            if (absolute) _bank.Set(deltaSeconds);
-            else _bank.Add(deltaSeconds);
-
-            await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+            await RequestAsync(chatId, absolute ? "set" : seconds < 0 ? "sub" : "add", Math.Abs(seconds), ct).ConfigureAwait(false);
             return;
         }
 
@@ -155,43 +165,35 @@ internal sealed partial class BotService : IDisposable
                 break;
 
             case "/add" when TryParseDuration(argument, out var add):
-                _bank.Add(add);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "add", add, ct).ConfigureAwait(false);
                 break;
 
             case "/sub" when TryParseDuration(argument, out var sub):
-                _bank.Add(-sub);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "sub", sub, ct).ConfigureAwait(false);
                 break;
 
             case "/set" when TryParseDuration(argument, out var set):
-                _bank.Set(set);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "set", set, ct).ConfigureAwait(false);
                 break;
 
             case "/pause":
-                _bank.SetPaused(true);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "pause", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/resume":
-                _bank.SetPaused(false);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "resume", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/free":
-                _bank.SetUnlimited(true);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "free", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/limit":
-                _bank.SetUnlimited(false);
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "unfree", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/lock":
-                _bank.LockNow();
-                await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+                await RequestAsync(chatId, "lock", 0, ct).ConfigureAwait(false);
                 break;
 
             case "/invite":
@@ -247,6 +249,8 @@ internal sealed partial class BotService : IDisposable
     private async Task HandleCallbackAsync(CallbackQuery callback, CancellationToken ct)
     {
         var chatId = callback.Message?.Chat?.Id ?? 0;
+        var messageId = callback.Message?.MessageId ?? 0;
+
         if (chatId == 0 || !_config.IsParent(chatId))
         {
             await _client.AnswerCallbackAsync(callback.Id, "Нет доступа", ct).ConfigureAwait(false);
@@ -254,75 +258,252 @@ internal sealed partial class BotService : IDisposable
         }
 
         var data = callback.Data ?? string.Empty;
-        string? toast = null;
-        var showParents = false;
+        var parts = data.Split(':');
+        var verb = parts[0];
 
-        if (data.StartsWith("add:", StringComparison.Ordinal) && long.TryParse(data[4..], out var add))
+        switch (verb)
         {
-            _bank.Add(add);
-            toast = $"Добавлено {TimeFormat.Human(add)}";
-        }
-        else if (data.StartsWith("sub:", StringComparison.Ordinal) && long.TryParse(data[4..], out var sub))
-        {
-            _bank.Add(-sub);
-            toast = $"Списано {TimeFormat.Human(sub)}";
-        }
-        else if (data.StartsWith("unbind:", StringComparison.Ordinal) && long.TryParse(data[7..], out var unbind))
-        {
-            toast = _config.RemoveParent(unbind) ? "Отвязан" : "Не найден";
-            showParents = true;
-        }
-        else
-        {
-            switch (data)
+            // Запрос подтверждения: состояние ещё не меняется.
+            case "ask":
             {
-                case "pause":
-                    _bank.SetPaused(true);
-                    toast = "Пауза";
-                    break;
-                case "resume":
-                    _bank.SetPaused(false);
-                    toast = "Продолжаем";
-                    break;
-                case "free":
-                    _bank.SetUnlimited(true);
-                    toast = "Безлимит включён";
-                    break;
-                case "unfree":
-                    _bank.SetUnlimited(false);
-                    toast = "Лимит вернулся";
-                    break;
-                case "lock":
-                    _bank.LockNow();
-                    toast = "Заблокировано";
-                    break;
-                case "parents":
-                    showParents = true;
-                    break;
-                case "invite":
-                    await _client.SendMessageAsync(chatId, BuildInviteText(), null, ct).ConfigureAwait(false);
-                    toast = "Код отправлен";
-                    showParents = true;
-                    break;
+                var kind = parts.Length > 1 ? parts[1] : string.Empty;
+                var argument = parts.Length > 2 && long.TryParse(parts[2], out var parsed) ? parsed : 0;
+
+                MarkBusy(chatId, true);
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await EditAsync(chatId, messageId, BuildConfirmText(kind, argument), Keyboards.Confirm(kind, argument), ct).ConfigureAwait(false);
+                return;
+            }
+
+            // Подтверждено — применяем.
+            case "ok":
+            {
+                var kind = parts.Length > 1 ? parts[1] : string.Empty;
+                var argument = parts.Length > 2 && long.TryParse(parts[2], out var parsed) ? parsed : 0;
+
+                var toast = Apply(kind, argument);
+                await _client.AnswerCallbackAsync(callback.Id, toast, ct).ConfigureAwait(false);
+                await ShowPanelAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "draft":
+            {
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await ShowDraftAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "d":
+            {
+                var draft = GetDraft(chatId);
+                if (parts.Length > 1 && int.TryParse(parts[1], out var delta))
+                    draft.Minutes = Math.Clamp(draft.Minutes + delta, 0, MaxDraftMinutes);
+
+                await _client.AnswerCallbackAsync(callback.Id, $"{draft.Minutes} мин", ct).ConfigureAwait(false);
+                await ShowDraftAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "dmode":
+            {
+                var draft = GetDraft(chatId);
+                draft.Absolute = !draft.Absolute;
+
+                // В режиме правки удобнее стартовать от текущего остатка.
+                if (draft.Absolute)
+                    draft.Minutes = Math.Clamp((int)Math.Round(_bank.RemainingSeconds / 60.0), 0, MaxDraftMinutes);
+
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await ShowDraftAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "dapply":
+            {
+                var draft = GetDraft(chatId);
+                var kind = draft.Absolute ? "set" : "add";
+                var argument = draft.Minutes * 60L;
+
+                MarkBusy(chatId, true);
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await EditAsync(chatId, messageId, BuildConfirmText(kind, argument), Keyboards.Confirm(kind, argument), ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "parents":
+            {
+                MarkBusy(chatId, true);
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await EditAsync(chatId, messageId, BuildParentsText(), Keyboards.Parents(_config.ParentChatIds, chatId), ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "invite":
+            {
+                await _client.SendMessageAsync(chatId, BuildInviteText(), null, ct).ConfigureAwait(false);
+                await _client.AnswerCallbackAsync(callback.Id, "Код отправлен", ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "unbind":
+            {
+                var removed = parts.Length > 1 && long.TryParse(parts[1], out var target) && _config.RemoveParent(target);
+                await _client.AnswerCallbackAsync(callback.Id, removed ? "Отвязан" : "Не найден", ct).ConfigureAwait(false);
+                await EditAsync(chatId, messageId, BuildParentsText(), Keyboards.Parents(_config.ParentChatIds, chatId), ct).ConfigureAwait(false);
+                return;
+            }
+
+            default:
+            {
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await ShowPanelAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
             }
         }
+    }
 
-        await _client.AnswerCallbackAsync(callback.Id, toast, ct).ConfigureAwait(false);
-
-        var messageId = callback.Message?.MessageId ?? 0;
-        if (messageId == 0) return;
-
-        if (showParents)
+    /// <summary>Применяет действие и возвращает короткий текст для всплывающей подсказки.</summary>
+    private string Apply(string kind, long argument)
+    {
+        switch (kind)
         {
-            await _client.EditMessageAsync(chatId, messageId, BuildParentsText(),
-                Keyboards.Parents(_config.ParentChatIds, chatId), ct).ConfigureAwait(false);
+            case "add":
+                _bank.Add(argument);
+                return $"Добавлено {TimeFormat.Human(argument)}";
+            case "sub":
+                _bank.Add(-argument);
+                return $"Списано {TimeFormat.Human(argument)}";
+            case "set":
+                _bank.Set(argument);
+                return $"Выставлено {TimeFormat.Human(argument)}";
+            case "pause":
+                _bank.SetPaused(true);
+                return "Пауза";
+            case "resume":
+                _bank.SetPaused(false);
+                return "Продолжаем";
+            case "free":
+                _bank.SetUnlimited(true);
+                return "Безлимит включён";
+            case "unfree":
+                _bank.SetUnlimited(false);
+                return "Лимит вернулся";
+            case "lock":
+                _bank.LockNow();
+                return "Заблокировано";
+            default:
+                return string.Empty;
+        }
+    }
+
+    /// <summary>Показывает экран подтверждения, а без подтверждений применяет сразу.</summary>
+    private async Task RequestAsync(long chatId, string kind, long argument, CancellationToken ct)
+    {
+        if (!_config.ConfirmActions)
+        {
+            Apply(kind, argument);
+            await SendPanelAsync(chatId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        await _client.SendMessageAsync(chatId, BuildConfirmText(kind, argument), Keyboards.Confirm(kind, argument), ct).ConfigureAwait(false);
+    }
+
+    private void MarkBusy(long chatId, bool busy)
+    {
+        lock (_busySync)
+        {
+            if (busy) _busyChats.Add(chatId);
+            else _busyChats.Remove(chatId);
+        }
+    }
+
+    private bool IsBusy(long chatId)
+    {
+        lock (_busySync) return _busyChats.Contains(chatId);
+    }
+
+    private Draft GetDraft(long chatId)
+    {
+        if (!_drafts.TryGetValue(chatId, out var draft))
+        {
+            draft = new Draft();
+            _drafts[chatId] = draft;
+        }
+
+        return draft;
+    }
+
+    private string BuildConfirmText(string kind, long argument)
+    {
+        var remaining = _bank.RemainingSeconds;
+        var sb = new StringBuilder();
+
+        switch (kind)
+        {
+            case "add":
+                sb.AppendLine($"Добавить <b>{TimeFormat.Human(argument)}</b>?");
+                sb.AppendLine($"Было {TimeFormat.Compact(remaining)} → станет {TimeFormat.Compact(remaining + argument)}");
+                break;
+            case "sub":
+                sb.AppendLine($"Списать <b>{TimeFormat.Human(argument)}</b>?");
+                sb.AppendLine($"Было {TimeFormat.Compact(remaining)} → станет {TimeFormat.Compact(Math.Max(0, remaining - argument))}");
+                break;
+            case "set":
+                sb.AppendLine($"Выставить ровно <b>{TimeFormat.Human(argument)}</b>?");
+                sb.AppendLine($"Сейчас {TimeFormat.Compact(remaining)}");
+                break;
+            case "pause":
+                sb.AppendLine("Поставить на паузу?");
+                sb.AppendLine("Экран заблокируется, остаток расходоваться не будет.");
+                break;
+            case "resume":
+                sb.AppendLine("Снять паузу?");
+                sb.AppendLine($"Останется {TimeFormat.Human(remaining)}.");
+                break;
+            case "free":
+                sb.AppendLine("Включить безлимит?");
+                sb.AppendLine("Блокировки не будет, пока не отмените.");
+                break;
+            case "unfree":
+                sb.AppendLine("Вернуть лимит?");
+                sb.AppendLine($"Останется {TimeFormat.Human(remaining)}.");
+                break;
+            case "lock":
+                sb.AppendLine("Заблокировать прямо сейчас?");
+                sb.AppendLine($"Остаток {TimeFormat.Human(remaining)} сгорит.");
+                break;
+            default:
+                sb.AppendLine("Подтвердить действие?");
+                break;
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private string BuildDraftText(long chatId)
+    {
+        var draft = GetDraft(chatId);
+        var remaining = _bank.RemainingSeconds;
+        var value = draft.Minutes * 60L;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>Точная настройка</b>");
+        sb.AppendLine();
+        sb.AppendLine($"Значение: <b>{draft.Minutes} мин</b>");
+
+        if (draft.Absolute)
+        {
+            sb.AppendLine($"Режим: выставить ровно (сейчас {TimeFormat.Compact(remaining)})");
         }
         else
         {
-            RememberPanel(chatId, messageId);
-            await _client.EditMessageAsync(chatId, messageId, BuildStatusText(),
-                Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+            sb.AppendLine("Режим: добавить к остатку");
+            sb.AppendLine($"Станет {TimeFormat.Compact(remaining + value)}");
         }
+
+        return sb.ToString().TrimEnd();
     }
 
     /// <summary>
@@ -343,6 +524,7 @@ internal sealed partial class BotService : IDisposable
         foreach (var (chatKey, messageId) in _state.PanelMessages.ToArray())
         {
             if (!long.TryParse(chatKey, out var chatId)) continue;
+            if (IsBusy(chatId)) continue;
             await _client.EditMessageAsync(chatId, messageId, text, markup, ct).ConfigureAwait(false);
         }
     }
@@ -369,6 +551,7 @@ internal sealed partial class BotService : IDisposable
 
     private async Task SendPanelAsync(long chatId, CancellationToken ct)
     {
+        MarkBusy(chatId, false);
         _lastPanelText = BuildStatusText();
         var messageId = await _client.SendMessageAsync(chatId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
         if (messageId is null) return;
@@ -376,6 +559,26 @@ internal sealed partial class BotService : IDisposable
         RememberPanel(chatId, messageId.Value);
         _store.Save(_state);
     }
+
+    private async Task ShowPanelAsync(long chatId, long messageId, CancellationToken ct)
+    {
+        if (messageId == 0) return;
+
+        MarkBusy(chatId, false);
+        RememberPanel(chatId, messageId);
+        _lastPanelText = BuildStatusText();
+        await EditAsync(chatId, messageId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+    }
+
+    private async Task ShowDraftAsync(long chatId, long messageId, CancellationToken ct)
+    {
+        if (messageId == 0) return;
+        MarkBusy(chatId, true);
+        await EditAsync(chatId, messageId, BuildDraftText(chatId), Keyboards.Draft(GetDraft(chatId).Absolute), ct).ConfigureAwait(false);
+    }
+
+    private Task EditAsync(long chatId, long messageId, string text, InlineKeyboardMarkup markup, CancellationToken ct) =>
+        messageId == 0 ? Task.CompletedTask : _client.EditMessageAsync(chatId, messageId, text, markup, ct);
 
     private void RememberPanel(long chatId, long messageId)
     {
@@ -504,7 +707,8 @@ internal sealed partial class BotService : IDisposable
         "/lock — заблокировать сейчас\n" +
         "/menu — панель с кнопками\n" +
         "/invite — код для второго родителя\n" +
-        "/quit — закрыть приложение на компьютере";
+        "/quit — закрыть приложение на компьютере\n\n" +
+        "Любое изменение сначала показывает экран подтверждения.";
 
     [GeneratedRegex(@"^(?<sign>[+\-−=])(?<value>\d{1,3}(:\d{1,2})?)$")]
     private static partial Regex BalanceRegex();

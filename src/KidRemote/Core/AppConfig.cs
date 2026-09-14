@@ -48,6 +48,10 @@ internal sealed class AppConfig
     [JsonPropertyName("autostart")]
     public bool Autostart { get; set; } = true;
 
+    /// <summary>Спрашивать подтверждение перед любым изменением: временем, паузой, безлимитом, блокировкой.</summary>
+    [JsonPropertyName("confirmActions")]
+    public bool ConfirmActions { get; set; } = true;
+
     /// <summary>Разрешить выход из приложения через меню в трее. По умолчанию выход только из бота командой /quit.</summary>
     [JsonPropertyName("allowTrayExit")]
     public bool AllowTrayExit { get; set; }
