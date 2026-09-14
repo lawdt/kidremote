@@ -92,6 +92,7 @@ internal static class Keyboards
         BotCommand.Create("limit", "Вернуть лимит"),
         BotCommand.Create("lock", "Заблокировать сейчас"),
         BotCommand.Create("invite", "Код для второго родителя"),
+        BotCommand.Create("password", "Пароль на настройки в трее"),
         BotCommand.Create("help", "Все команды"),
         BotCommand.Create("quit", "Закрыть приложение на компьютере")
     };

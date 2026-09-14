@@ -215,6 +215,20 @@ internal sealed partial class BotService : IDisposable
                 await RequestAsync(chatId, "lock", 0, ct).ConfigureAwait(false);
                 break;
 
+            case "/password" when argument.Length >= 4:
+                _config.SetPassword(argument);
+                await _client.SendMessageAsync(chatId,
+                    "Пароль сохранён. Он спрашивается при открытии настроек из трея.\n\n" +
+                    "Удалите сообщение с паролем из чата — в истории ему не место.",
+                    null, ct).ConfigureAwait(false);
+                break;
+
+            case "/password":
+                await _client.SendMessageAsync(chatId,
+                    "Задайте пароль не короче четырёх символов:\n<code>/password ваш_пароль</code>",
+                    null, ct).ConfigureAwait(false);
+                break;
+
             case "/invite":
                 await _client.SendMessageAsync(chatId, BuildInviteText(), null, ct).ConfigureAwait(false);
                 break;
@@ -725,6 +739,9 @@ internal sealed partial class BotService : IDisposable
             : "Сигнал и рамка отключены, остаётся только таймер в углу.");
         sb.AppendLine();
         sb.AppendLine($"Пауза при простое: {_config.IdlePauseSeconds} с.");
+        sb.AppendLine(_config.HasPassword
+            ? "Пароль на настройки в трее: задан."
+            : "Пароль на настройки в трее: не задан, пункт меню закрыт. Команда /password.");
         return sb.ToString().TrimEnd();
     }
 
@@ -865,6 +882,7 @@ internal sealed partial class BotService : IDisposable
         "/lock — заблокировать сейчас\n" +
         "/menu — панель с кнопками\n" +
         "/invite — код для второго родителя\n" +
+        "/password — пароль на настройки в трее\n" +
         "/quit — закрыть приложение на компьютере\n\n" +
         "Любое изменение сначала показывает экран подтверждения.";
 

@@ -48,6 +48,10 @@ internal sealed class AppConfig
     [JsonPropertyName("autostart")]
     public bool Autostart { get; set; } = true;
 
+    /// <summary>Пароль на пункты меню в трее. Хранится как соль и хэш, сам пароль нигде не лежит.</summary>
+    [JsonPropertyName("adminPassword")]
+    public string AdminPasswordHash { get; set; } = string.Empty;
+
     /// <summary>Звуковые сигналы и красная рамка на последней минуте.</summary>
     [JsonPropertyName("alarmsEnabled")]
     public bool AlarmsEnabled { get; set; } = true;
@@ -59,10 +63,6 @@ internal sealed class AppConfig
     /// <summary>Спрашивать подтверждение перед любым изменением: временем, паузой, безлимитом, блокировкой.</summary>
     [JsonPropertyName("confirmActions")]
     public bool ConfirmActions { get; set; } = true;
-
-    /// <summary>Разрешить выход из приложения через меню в трее. По умолчанию выход только из бота командой /quit.</summary>
-    [JsonPropertyName("allowTrayExit")]
-    public bool AllowTrayExit { get; set; }
 
     [JsonIgnore]
     public string ResolvedToken { get; private set; } = string.Empty;
@@ -119,6 +119,17 @@ internal sealed class AppConfig
         Directory.CreateDirectory(Paths.DataDirectory);
         File.WriteAllText(ConfigPath, JsonSerializer.Serialize(this, Options));
     }
+
+    [JsonIgnore]
+    public bool HasPassword => !string.IsNullOrEmpty(AdminPasswordHash);
+
+    public void SetPassword(string password)
+    {
+        AdminPasswordHash = PasswordHash.Create(password);
+        Save();
+    }
+
+    public bool VerifyPassword(string password) => PasswordHash.Verify(password, AdminPasswordHash);
 
     public bool IsParent(long chatId) => ParentChatIds.Contains(chatId);
 

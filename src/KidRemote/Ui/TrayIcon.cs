@@ -20,7 +20,6 @@ internal sealed class TrayIcon : IDisposable
     private IntPtr _currentHandle = IntPtr.Zero;
     private Color _currentColor = Color.Empty;
 
-    public event Action? ExitRequested;
     public event Action? OpenConfigRequested;
 
     public TrayIcon()
@@ -30,8 +29,7 @@ internal sealed class TrayIcon : IDisposable
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(_statusItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Открыть настройки", null, (_, _) => OpenConfigRequested?.Invoke());
-        menu.Items.Add("Выход", null, (_, _) => ExitRequested?.Invoke());
+        menu.Items.Add("Открыть настройки…", null, (_, _) => OpenConfigRequested?.Invoke());
 
         _icon = new Forms.NotifyIcon
         {

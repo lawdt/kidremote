@@ -91,7 +91,6 @@ public partial class App : Application
 
         _tray = new TrayIcon();
         _tray.OpenConfigRequested += OpenConfig;
-        _tray.ExitRequested += OnTrayExitRequested;
 
         _bot = new BotService(_config, _bank, _store, _state, () => _activity.Capture());
         _bot.ShutdownRequested += RequestShutdown;
@@ -268,17 +267,6 @@ public partial class App : Application
         _store.Save(_state);
     }
 
-    private void OnTrayExitRequested()
-    {
-        if (!_config.AllowTrayExit)
-        {
-            _tray.ShowMessage("KidRemote", "Выход отключён. Закрыть приложение можно командой /quit в боте.");
-            return;
-        }
-
-        RequestShutdown();
-    }
-
     internal void RequestShutdown() => Dispatcher.BeginInvoke(() =>
     {
         // Сторож не должен воскрешать приложение после осознанного выхода.
@@ -292,7 +280,26 @@ public partial class App : Application
         Shutdown();
     });
 
+    /// <summary>Настройки из трея открываются только по родительскому паролю.</summary>
     private void OpenConfig()
+    {
+        if (!_config.HasPassword)
+        {
+            _tray.ShowMessage("KidRemote",
+                "Настройки закрыты. Сначала задайте пароль в боте: /password ваш_пароль");
+            return;
+        }
+
+        var prompt = new PasswordWindow(
+            "Введите родительский пароль, чтобы открыть файл настроек.",
+            _config.VerifyPassword);
+
+        if (prompt.ShowDialog() != true) return;
+
+        OpenConfigFile();
+    }
+
+    private void OpenConfigFile()
     {
         try
         {
@@ -310,7 +317,7 @@ public partial class App : Application
             "Укажите токен бота в файле настроек и запустите приложение снова:\n\n" + AppConfig.ConfigPath,
             "KidRemote", MessageBoxButton.OK, MessageBoxImage.Information);
 
-        OpenConfig();
+        OpenConfigFile();
     }
 
     protected override void OnExit(ExitEventArgs e)
