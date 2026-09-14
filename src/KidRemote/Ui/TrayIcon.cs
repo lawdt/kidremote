@@ -1,5 +1,7 @@
 ﻿using System.Drawing;
 using System.Drawing.Drawing2D;
+using Color = System.Drawing.Color;
+using Pen = System.Drawing.Pen;
 using KidRemote.Core;
 using Forms = System.Windows.Forms;
 

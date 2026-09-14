@@ -18,6 +18,14 @@
     <Version>1.0.0</Version>
   </PropertyGroup>
 
+  <!-- WinForms нужен только для трея и Screen, поэтому его глобальные usings убраны:
+       иначе Application, Brush, Color и Pen конфликтуют с одноимёнными типами WPF. -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Windows.Shapes" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Win32.SystemEvents" Version="8.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
