@@ -124,8 +124,23 @@ internal static class Keyboards
     }
 
     /// <summary>Переключатели прямо в чате: их видно и меняются одним нажатием.</summary>
-    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool alarms)
+    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool alarms, int idleSeconds)
     {
+        var idleOptions = new (string Caption, int Seconds)[]
+        {
+            ("Выкл", 0),
+            ("30 с", 30),
+            ("1 мин", 60),
+            ("2 мин", 120),
+            ("5 мин", 300)
+        };
+
+        var idleRow = idleOptions
+            .Select(option => InlineKeyboardButton.Create(
+                option.Seconds == idleSeconds ? $"• {option.Caption}" : option.Caption,
+                $"idle:{option.Seconds}"))
+            .ToList();
+
         return new InlineKeyboardMarkup
         {
             InlineKeyboard = new List<List<InlineKeyboardButton>>
@@ -140,6 +155,7 @@ internal static class Keyboards
                     InlineKeyboardButton.Create(
                         $"{(alarms ? "☑️" : "⬜️")} Сигнализация: звук и рамка", "toggle:alarms")
                 },
+                idleRow,
                 new() { InlineKeyboardButton.Create("⬅️ Назад", "status") }
             }
         };

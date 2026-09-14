@@ -57,7 +57,7 @@ internal sealed class ActivityMonitor : IDisposable
             SessionActive: _sessionActive,
             SystemAwake: _systemAwake,
             FullscreenApp: fullscreen,
-            UserActive: IdleSeconds() < _config.IdlePauseSeconds,
+            UserActive: _config.IdlePauseSeconds <= 0 || IdleSeconds() < _config.IdlePauseSeconds,
             ForegroundProcess: processName);
     }
 

@@ -417,6 +417,23 @@ internal sealed partial class BotService : IDisposable
                 return;
             }
 
+            case "idle":
+            {
+                if (parts.Length > 1 && int.TryParse(parts[1], out var seconds))
+                {
+                    _config.IdlePauseSeconds = Math.Clamp(seconds, 0, 3600);
+                    _config.Save();
+                }
+
+                await _client.AnswerCallbackAsync(callback.Id,
+                    _config.IdlePauseSeconds > 0
+                        ? $"Пауза через {_config.IdlePauseSeconds} с простоя"
+                        : "Простой не учитывается",
+                    ct).ConfigureAwait(false);
+                await ShowSettingsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
             case "parents":
             {
                 MarkBusy(chatId, true);
@@ -722,7 +739,8 @@ internal sealed partial class BotService : IDisposable
 
         MarkBusy(chatId, true);
         await EditAsync(chatId, messageId, BuildSettingsText(),
-            Keyboards.Settings(_config.RequireFullscreen, _config.AlarmsEnabled), ct).ConfigureAwait(false);
+            Keyboards.Settings(_config.RequireFullscreen, _config.AlarmsEnabled, _config.IdlePauseSeconds),
+            ct).ConfigureAwait(false);
     }
 
     private string BuildSettingsText()
@@ -738,7 +756,10 @@ internal sealed partial class BotService : IDisposable
             ? "На последней минуте звучит сигнал и мигает красная рамка."
             : "Сигнал и рамка отключены, остаётся только таймер в углу.");
         sb.AppendLine();
-        sb.AppendLine($"Пауза при простое: {_config.IdlePauseSeconds} с.");
+        sb.AppendLine(_config.IdlePauseSeconds > 0
+            ? $"Если ничего не нажимать {_config.IdlePauseSeconds} с, отсчёт замирает."
+            : "Простой не учитывается: время идёт, пока открыта игра.");
+        sb.AppendLine();
         sb.AppendLine(_config.HasPassword
             ? "Пароль на настройки в трее: задан."
             : "Пароль на настройки в трее: не задан, пункт меню закрыт. Команда /password.");
