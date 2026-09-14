@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media.Animation;
 using KidRemote.Core;
 using KidRemote.Interop;
 using Forms = System.Windows.Forms;
@@ -31,20 +32,36 @@ public partial class LockOverlayWindow : Window
         Height = bounds.Height / scaleY;
     }
 
-    internal void Render(BankState state)
+    internal void Render(BankState state, string phrase)
     {
         if (state == BankState.Paused)
         {
             Glyph.Text = "⏸";
             Headline.Text = "Перерыв";
-            Subtitle.Text = "Время на паузе и не расходуется";
+            SetSubtitle("Время на паузе и не расходуется");
         }
         else
         {
             Glyph.Text = "🔒";
             Headline.Text = "Время вышло";
-            Subtitle.Text = "Попроси родителей добавить время";
+            SetSubtitle(phrase);
         }
+    }
+
+    private void SetSubtitle(string text)
+    {
+        if (Subtitle.Text == text) return;
+
+        Subtitle.Text = text;
+
+        // Новая фраза проявляется, а не подменяется рывком.
+        Subtitle.BeginAnimation(OpacityProperty, new DoubleAnimation
+        {
+            From = 0.0,
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(450),
+            FillBehavior = FillBehavior.Stop
+        });
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
