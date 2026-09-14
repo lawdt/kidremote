@@ -2,6 +2,14 @@
 
 namespace KidRemote.Telegram;
 
+/// <summary>Что делать с набранным в конструкторе значением.</summary>
+internal enum DraftMode
+{
+    Add,
+    Subtract,
+    Set
+}
+
 internal static class Keyboards
 {
     /// <summary>Главная панель. Все изменяющие кнопки ведут на экран подтверждения.</summary>
@@ -72,8 +80,15 @@ internal static class Keyboards
     }
 
     /// <summary>Конструктор точного значения: шаг в одну минуту.</summary>
-    public static InlineKeyboardMarkup Draft(bool absolute)
+    public static InlineKeyboardMarkup Draft(DraftMode mode)
     {
+        var modeCaption = mode switch
+        {
+            DraftMode.Subtract => "Режим: вычесть из остатка",
+            DraftMode.Set => "Режим: выставить ровно",
+            _ => "Режим: добавить к остатку"
+        };
+
         return new InlineKeyboardMarkup
         {
             InlineKeyboard = new List<List<InlineKeyboardButton>>
@@ -94,7 +109,7 @@ internal static class Keyboards
                 },
                 new()
                 {
-                    InlineKeyboardButton.Create(absolute ? "Режим: выставить ровно" : "Режим: добавить к остатку", "dmode")
+                    InlineKeyboardButton.Create(modeCaption, "dmode")
                 },
                 new()
                 {

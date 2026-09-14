@@ -18,7 +18,7 @@ internal sealed partial class BotService : IDisposable
     private sealed class Draft
     {
         public int Minutes { get; set; } = 15;
-        public bool Absolute { get; set; }
+        public DraftMode Mode { get; set; } = DraftMode.Add;
     }
 
     /// <summary>Родитель попросил закрыть приложение командой /quit.</summary>
@@ -314,10 +314,15 @@ internal sealed partial class BotService : IDisposable
             case "dmode":
             {
                 var draft = GetDraft(chatId);
-                draft.Absolute = !draft.Absolute;
+                draft.Mode = draft.Mode switch
+                {
+                    DraftMode.Add => DraftMode.Subtract,
+                    DraftMode.Subtract => DraftMode.Set,
+                    _ => DraftMode.Add
+                };
 
                 // В режиме правки удобнее стартовать от текущего остатка.
-                if (draft.Absolute)
+                if (draft.Mode == DraftMode.Set)
                     draft.Minutes = Math.Clamp((int)Math.Round(_bank.RemainingSeconds / 60.0), 0, MaxDraftMinutes);
 
                 await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
@@ -328,7 +333,12 @@ internal sealed partial class BotService : IDisposable
             case "dapply":
             {
                 var draft = GetDraft(chatId);
-                var kind = draft.Absolute ? "set" : "add";
+                var kind = draft.Mode switch
+                {
+                    DraftMode.Subtract => "sub",
+                    DraftMode.Set => "set",
+                    _ => "add"
+                };
                 var argument = draft.Minutes * 60L;
 
                 MarkBusy(chatId, true);
@@ -526,14 +536,19 @@ internal sealed partial class BotService : IDisposable
         sb.AppendLine();
         sb.AppendLine($"Значение: <b>{draft.Minutes} мин</b>");
 
-        if (draft.Absolute)
+        switch (draft.Mode)
         {
-            sb.AppendLine($"Режим: выставить ровно (сейчас {TimeFormat.Compact(remaining)})");
-        }
-        else
-        {
-            sb.AppendLine("Режим: добавить к остатку");
-            sb.AppendLine($"Станет {TimeFormat.Compact(remaining + value)}");
+            case DraftMode.Subtract:
+                sb.AppendLine("Режим: вычесть из остатка");
+                sb.AppendLine($"Станет {TimeFormat.Compact(Math.Max(0, remaining - value))}");
+                break;
+            case DraftMode.Set:
+                sb.AppendLine($"Режим: выставить ровно (сейчас {TimeFormat.Compact(remaining)})");
+                break;
+            default:
+                sb.AppendLine("Режим: добавить к остатку");
+                sb.AppendLine($"Станет {TimeFormat.Compact(remaining + value)}");
+                break;
         }
 
         return sb.ToString().TrimEnd();
@@ -607,7 +622,7 @@ internal sealed partial class BotService : IDisposable
     {
         if (messageId == 0) return;
         MarkBusy(chatId, true);
-        await EditAsync(chatId, messageId, BuildDraftText(chatId), Keyboards.Draft(GetDraft(chatId).Absolute), ct).ConfigureAwait(false);
+        await EditAsync(chatId, messageId, BuildDraftText(chatId), Keyboards.Draft(GetDraft(chatId).Mode), ct).ConfigureAwait(false);
     }
 
     private Task EditAsync(long chatId, long messageId, string text, InlineKeyboardMarkup? markup, CancellationToken ct) =>
