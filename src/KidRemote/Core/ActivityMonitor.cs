@@ -123,6 +123,8 @@ internal sealed class ActivityMonitor : IDisposable
 
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
     {
+        Log.Write($"сессия: {e.Reason}");
+
         _sessionActive = e.Reason switch
         {
             SessionSwitchReason.SessionLock => false,
@@ -141,6 +143,8 @@ internal sealed class ActivityMonitor : IDisposable
 
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
+        Log.Write($"питание: {e.Mode}");
+
         switch (e.Mode)
         {
             case PowerModes.Suspend:

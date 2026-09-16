@@ -17,6 +17,12 @@ public partial class App : Application
     /// <summary>Последние секунды отсчитываются посекундно.</summary>
     private const long FinalCountdownSeconds = 10;
 
+    /// <summary>
+    /// Разрыв между тиками больше этого означает, что система спала. Нужен потому, что
+    /// в современном режиме ожидания событие питания может не прийти вовсе.
+    /// </summary>
+    private static readonly TimeSpan SleepGapThreshold = TimeSpan.FromSeconds(45);
+
     private Mutex? _singleInstance;
     private CancellationTokenSource? _guardCts;
     private bool _guardMode;
@@ -39,6 +45,8 @@ public partial class App : Application
     private DispatcherTimer? _panelTimer;
     private DispatcherTimer? _guardTimer;
 
+    private DateTime _lastTickUtc = DateTime.UtcNow;
+    private DateTime _lastWakeUtc = DateTime.MinValue;
     private long _lastRenderedSeconds = -1;
     private BankState _lastState = BankState.Locked;
     private bool? _lastConsuming;
@@ -141,16 +149,25 @@ public partial class App : Application
         return $"{headline}\nОсталось: {remaining}";
     }
 
-    private void OnSystemResumed()
-    {
-        Dispatcher.BeginInvoke(() =>
-        {
-            ApplyResumeGrant();
-            RenderAll(force: true);
+    private void OnSystemResumed() => Dispatcher.BeginInvoke(() => HandleWake("событие питания"));
 
-            _ = _bot.NotifyAsync(AlertKind.Wake, BuildResumeText("⏰ Компьютер проснулся"));
-            _ = _bot.RefreshPanelsAsync(force: true);
-        });
+    /// <summary>
+    /// Пробуждение приходит двумя путями — событием питания и разрывом в тиках.
+    /// Второй раз подряд отрабатывать его незачем.
+    /// </summary>
+    private void HandleWake(string reason)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastWakeUtc < TimeSpan.FromSeconds(15)) return;
+        _lastWakeUtc = now;
+
+        Log.Write($"пробуждение: {reason}");
+
+        ApplyResumeGrant();
+        RenderAll(force: true);
+
+        _ = _bot.NotifyAsync(AlertKind.Wake, BuildResumeText("⏰ Компьютер проснулся"));
+        _ = _bot.RefreshPanelsAsync(force: true);
     }
 
     private void StartGuardMode()
@@ -204,6 +221,13 @@ public partial class App : Application
     {
         var delta = _tickWatch.Elapsed.TotalSeconds;
         _tickWatch.Restart();
+
+        // Таймер не тикает, пока машина спит: большая дыра во времени и есть признак сна.
+        var now = DateTime.UtcNow;
+        var gap = now - _lastTickUtc;
+        _lastTickUtc = now;
+
+        if (gap > SleepGapThreshold) HandleWake($"разрыв {gap.TotalSeconds:0} с");
 
         var snapshot = _activity.Capture();
         if (delta <= MaxTrustedDeltaSeconds && snapshot.ShouldConsume)
