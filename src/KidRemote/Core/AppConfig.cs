@@ -21,6 +21,14 @@ internal sealed class AppConfig
     [JsonPropertyName("idlePauseSeconds")]
     public int IdlePauseSeconds { get; set; } = 60;
 
+    /// <summary>Засчитывать известные игры, даже когда они запущены в окне.</summary>
+    [JsonPropertyName("detectKnownGames")]
+    public bool DetectKnownGames { get; set; } = true;
+
+    /// <summary>Свои игры: имена процессов без расширения, дополняют встроенный список.</summary>
+    [JsonPropertyName("extraGames")]
+    public List<string> ExtraGames { get; set; } = new();
+
     /// <summary>Списывать время только когда на переднем плане полноэкранное приложение.</summary>
     [JsonPropertyName("requireFullscreen")]
     public bool RequireFullscreen { get; set; } = true;

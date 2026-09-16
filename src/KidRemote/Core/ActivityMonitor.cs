@@ -7,20 +7,21 @@ namespace KidRemote.Core;
 internal sealed record ActivitySnapshot(
     bool SessionActive,
     bool SystemAwake,
-    bool FullscreenApp,
+    bool GameActive,
     bool UserActive,
-    string? ForegroundProcess)
+    string? ForegroundProcess,
+    bool KnownGame)
 {
     /// <summary>Время списывается только когда сошлось всё сразу.</summary>
-    public bool ShouldConsume => SessionActive && SystemAwake && FullscreenApp && UserActive;
+    public bool ShouldConsume => SessionActive && SystemAwake && GameActive && UserActive;
 
     public string Explain()
     {
         if (!SystemAwake) return "система в спящем режиме";
         if (!SessionActive) return "сессия заблокирована";
-        if (!FullscreenApp) return "нет полноэкранного приложения";
+        if (!GameActive) return "игра не запущена";
         if (!UserActive) return "простой";
-        return "идёт расход";
+        return KnownGame ? "идёт расход, игра опознана" : "идёт расход";
     }
 }
 
@@ -32,6 +33,12 @@ internal sealed class ActivityMonitor : IDisposable
 {
     private readonly AppConfig _config;
     private readonly uint _ownProcessId;
+
+    // Снимок берётся четыре раза в секунду, а чтение пути процесса дорогое —
+    // держим результат для текущего процесса на переднем плане.
+    private uint _cachedPid;
+    private string? _cachedName;
+    private bool _cachedFromStore;
     private volatile bool _sessionActive = true;
     private volatile bool _systemAwake = true;
     private bool _disposed;
@@ -53,15 +60,21 @@ internal sealed class ActivityMonitor : IDisposable
     public ActivitySnapshot Capture()
     {
         var foreground = NativeMethods.GetForegroundWindow();
-        var fullscreen = !_config.RequireFullscreen || IsFullscreen(foreground, out _);
-        var processName = TryGetProcessName(foreground);
+        var (processName, fromStore) = Describe(foreground);
+
+        // Знакомую игру засчитываем и в окне: играют далеко не всегда на весь экран.
+        var knownGame = _config.DetectKnownGames
+                        && (fromStore || GameCatalog.IsGame(processName, _config.ExtraGames));
+
+        var active = !_config.RequireFullscreen || knownGame || IsFullscreen(foreground, out _);
 
         return new ActivitySnapshot(
             SessionActive: _sessionActive,
             SystemAwake: _systemAwake,
-            FullscreenApp: fullscreen,
+            GameActive: active,
             UserActive: _config.IdlePauseSeconds <= 0 || IdleSeconds() < _config.IdlePauseSeconds,
-            ForegroundProcess: processName);
+            ForegroundProcess: processName,
+            KnownGame: knownGame);
     }
 
     public static double IdleSeconds()
@@ -102,6 +115,45 @@ internal sealed class ActivityMonitor : IDisposable
 
         if (covers) processName = TryGetProcessName(hWnd);
         return covers;
+    }
+
+    /// <summary>Имя процесса и признак «запущен из папки игрового магазина».</summary>
+    private (string? Name, bool FromStore) Describe(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return (null, false);
+
+        NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
+        if (pid == 0) return (null, false);
+        if (pid == _cachedPid) return (_cachedName, _cachedFromStore);
+
+        string? name = null;
+        var fromStore = false;
+
+        try
+        {
+            using var process = Process.GetProcessById((int)pid);
+            name = process.ProcessName;
+
+            // Путь читается не у всех процессов: у системных и у чужих учётных записей будет отказ.
+            try
+            {
+                fromStore = GameCatalog.IsGamePath(process.MainModule?.FileName);
+            }
+            catch
+            {
+                fromStore = false;
+            }
+        }
+        catch
+        {
+            name = null;
+        }
+
+        _cachedPid = pid;
+        _cachedName = name;
+        _cachedFromStore = fromStore;
+
+        return (name, fromStore);
     }
 
     private static string? TryGetProcessName(IntPtr hWnd)

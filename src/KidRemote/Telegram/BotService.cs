@@ -391,6 +391,12 @@ internal sealed partial class BotService : IDisposable
                             ? "Только полноэкранные игры"
                             : "Любое использование компьютера";
                         break;
+                    case "games":
+                        _config.DetectKnownGames = !_config.DetectKnownGames;
+                        toast = _config.DetectKnownGames
+                            ? "Игры засчитываются и в окне"
+                            : "Только полноэкранный режим";
+                        break;
                     case "alarms":
                         _config.AlarmsEnabled = !_config.AlarmsEnabled;
                         toast = _config.AlarmsEnabled ? "Сигнализация включена" : "Сигнализация выключена";
@@ -781,7 +787,8 @@ internal sealed partial class BotService : IDisposable
 
         MarkBusy(chatId, true);
         await EditAsync(chatId, messageId, BuildSettingsText(),
-            Keyboards.Settings(_config.RequireFullscreen, _config.AlarmsEnabled, _config.IdlePauseSeconds),
+            Keyboards.Settings(_config.RequireFullscreen, _config.DetectKnownGames, _config.AlarmsEnabled,
+                _config.IdlePauseSeconds),
             ct).ConfigureAwait(false);
     }
 
@@ -791,8 +798,16 @@ internal sealed partial class BotService : IDisposable
         sb.AppendLine("<b>Настройки</b>");
         sb.AppendLine();
         sb.AppendLine(_config.RequireFullscreen
-            ? "Время расходуется только когда открыта полноэкранная игра."
+            ? "Время расходуется только когда открыта игра."
             : "Время расходуется при любом использовании компьютера.");
+
+        if (_config.RequireFullscreen)
+        {
+            sb.AppendLine(_config.DetectKnownGames
+                ? "Известные игры и всё, запущенное из Steam, засчитываются даже в окне."
+                : "Засчитывается только полноэкранный режим.");
+        }
+
         sb.AppendLine();
         sb.AppendLine(_config.AlarmsEnabled
             ? "На последней минуте звучит сигнал и мигает красная рамка."

@@ -114,7 +114,7 @@ internal static class Keyboards
     }
 
     /// <summary>Переключатели прямо в чате: их видно и меняются одним нажатием.</summary>
-    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool alarms, int idleSeconds)
+    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool detectGames, bool alarms, int idleSeconds)
     {
         var idleOptions = new (string Caption, int Seconds)[]
         {
@@ -139,6 +139,11 @@ internal static class Keyboards
                 {
                     InlineKeyboardButton.Create(
                         $"{(requireFullscreen ? "☑️" : "⬜️")} Только полноэкранные игры", "toggle:fullscreen")
+                },
+                new()
+                {
+                    InlineKeyboardButton.Create(
+                        $"{(detectGames ? "☑️" : "⬜️")} Засчитывать игры в окне", "toggle:games")
                 },
                 new()
                 {
