@@ -10,7 +10,8 @@ internal sealed record ActivitySnapshot(
     bool GameActive,
     bool UserActive,
     string? ForegroundProcess,
-    bool KnownGame)
+    bool KnownGame,
+    uint ProcessId)
 {
     /// <summary>Время списывается только когда сошлось всё сразу.</summary>
     public bool ShouldConsume => SessionActive && SystemAwake && GameActive && UserActive;
@@ -60,7 +61,7 @@ internal sealed class ActivityMonitor : IDisposable
     public ActivitySnapshot Capture()
     {
         var foreground = NativeMethods.GetForegroundWindow();
-        var (processName, fromStore) = Describe(foreground);
+        var (processName, fromStore, pid) = Describe(foreground);
 
         // Знакомую игру засчитываем и в окне: играют далеко не всегда на весь экран.
         var knownGame = _config.DetectKnownGames
@@ -74,7 +75,8 @@ internal sealed class ActivityMonitor : IDisposable
             GameActive: active,
             UserActive: _config.IdlePauseSeconds <= 0 || IdleSeconds() < _config.IdlePauseSeconds,
             ForegroundProcess: processName,
-            KnownGame: knownGame);
+            KnownGame: knownGame,
+            ProcessId: pid);
     }
 
     public static double IdleSeconds()
@@ -118,13 +120,13 @@ internal sealed class ActivityMonitor : IDisposable
     }
 
     /// <summary>Имя процесса и признак «запущен из папки игрового магазина».</summary>
-    private (string? Name, bool FromStore) Describe(IntPtr hWnd)
+    private (string? Name, bool FromStore, uint Pid) Describe(IntPtr hWnd)
     {
-        if (hWnd == IntPtr.Zero) return (null, false);
+        if (hWnd == IntPtr.Zero) return (null, false, 0);
 
         NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
-        if (pid == 0) return (null, false);
-        if (pid == _cachedPid) return (_cachedName, _cachedFromStore);
+        if (pid == 0) return (null, false, 0);
+        if (pid == _cachedPid) return (_cachedName, _cachedFromStore, pid);
 
         string? name = null;
         var fromStore = false;
@@ -153,7 +155,7 @@ internal sealed class ActivityMonitor : IDisposable
         _cachedName = name;
         _cachedFromStore = fromStore;
 
-        return (name, fromStore);
+        return (name, fromStore, pid);
     }
 
     private static string? TryGetProcessName(IntPtr hWnd)

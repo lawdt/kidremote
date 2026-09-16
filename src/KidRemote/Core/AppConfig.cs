@@ -17,6 +17,10 @@ internal sealed class AppConfig
     [JsonPropertyName("parentChatIds")]
     public List<long> ParentChatIds { get; set; } = new();
 
+    /// <summary>Фора после запуска игры: столько секунд отсчёт ещё не идёт.</summary>
+    [JsonPropertyName("gameStartDelaySeconds")]
+    public int GameStartDelaySeconds { get; set; } = 10;
+
     /// <summary>Сколько секунд без ввода считать простоем (таймер замирает).</summary>
     [JsonPropertyName("idlePauseSeconds")]
     public int IdlePauseSeconds { get; set; } = 60;

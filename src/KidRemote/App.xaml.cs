@@ -45,6 +45,9 @@ public partial class App : Application
     private DispatcherTimer? _panelTimer;
     private DispatcherTimer? _guardTimer;
 
+    /// <summary>Сколько игра уже пробыла на переднем плане, по идентификатору процесса.</summary>
+    private readonly Dictionary<uint, double> _gamePresence = new();
+
     private DateTime _lastTickUtc = DateTime.UtcNow;
     private DateTime _lastWakeUtc = DateTime.MinValue;
     private long _lastRenderedSeconds = -1;
@@ -227,7 +230,7 @@ public partial class App : Application
         if (gap > SleepGapThreshold) HandleWake($"разрыв {gap.TotalSeconds:0} с");
 
         var snapshot = _activity.Capture();
-        if (delta <= MaxTrustedDeltaSeconds && snapshot.ShouldConsume)
+        if (delta <= MaxTrustedDeltaSeconds && snapshot.ShouldConsume && HasSettledIn(snapshot, delta))
             _bank.Consume(delta);
 
         _countdown.UpdateCursorProximity();
@@ -288,6 +291,34 @@ public partial class App : Application
             _ = _bot.NotifyAsync(AlertKind.Warning, $"⏳ У ребёнка осталось {TimeFormat.Human(remaining)}.");
 
         _lastRenderedSeconds = remaining;
+    }
+
+    /// <summary>
+    /// Первые секунды после запуска игры не списываются: загрузка, заставки и меню
+    /// не должны съедать выданное время. Фора считается на процесс, поэтому свернуть
+    /// и развернуть игру ради новой форы не выйдет.
+    /// </summary>
+    private bool HasSettledIn(ActivitySnapshot snapshot, double delta)
+    {
+        var required = Math.Max(0, _config.GameStartDelaySeconds);
+        if (required == 0 || snapshot.ProcessId == 0) return true;
+
+        _gamePresence.TryGetValue(snapshot.ProcessId, out var presence);
+        presence += delta;
+        _gamePresence[snapshot.ProcessId] = presence;
+
+        // Идентификаторы завершённых процессов накапливаются — изредка чистим.
+        if (_gamePresence.Count > 32) TrimPresence(snapshot.ProcessId);
+
+        return presence >= required;
+    }
+
+    private void TrimPresence(uint keep)
+    {
+        var survivors = _gamePresence.Where(pair => pair.Key == keep).ToList();
+        _gamePresence.Clear();
+
+        foreach (var pair in survivors) _gamePresence[pair.Key] = pair.Value;
     }
 
     private bool ShouldShowCountdown(BankState state, long remaining) => _config.CountdownMode switch
