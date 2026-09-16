@@ -126,17 +126,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// После включения и пробуждения накопленное время не возвращается: остаётся короткая фора,
-    /// чтобы ребёнок не получил час игры, просто разбудив компьютер. Безлимит тоже снимается.
+    /// Включение и пробуждение снимают безлимит: режим «играй сколько хочешь» не должен
+    /// переживать сон. Обычный остаток при этом сохраняется — выданные минуты не сгорают.
     /// </summary>
     private void ApplyResumeGrant()
     {
-        var grant = Math.Max(0, _config.ResumeGrantSeconds);
+        if (!_bank.IsUnlimited) return;
 
-        // Меньше форы не выдаём, но и не добавляем: уменьшать можно, увеличивать — нет.
-        if (!_bank.IsUnlimited && _bank.RemainingSeconds <= grant) return;
-
-        _bank.Set(grant);
+        _bank.Set(Math.Max(0, _config.ResumeGrantSeconds));
         Persist();
     }
 
