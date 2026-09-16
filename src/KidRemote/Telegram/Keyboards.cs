@@ -146,6 +146,7 @@ internal static class Keyboards
                         $"{(alarms ? "☑️" : "⬜️")} Сигнализация: звук и рамка", "toggle:alarms")
                 },
                 idleRow,
+                new() { InlineKeyboardButton.Create("🔔 Мои уведомления", "alerts") },
                 new() { InlineKeyboardButton.Create("⬅️ Назад", "status") }
             }
         };
@@ -208,6 +209,24 @@ internal static class Keyboards
                 }
             }
         };
+    }
+
+    /// <summary>Персональные переключатели уведомлений — у каждого родителя свои.</summary>
+    public static InlineKeyboardMarkup Alerts(AlertSettings settings)
+    {
+        var kinds = new[] { AlertKind.TimeUp, AlertKind.Warning, AlertKind.Wake, AlertKind.Startup, AlertKind.System };
+
+        var rows = kinds
+            .Select(kind => new List<InlineKeyboardButton>
+            {
+                InlineKeyboardButton.Create(
+                    $"{(settings.IsEnabled(kind) ? "🔔" : "🔕")} {AlertSettings.Caption(kind)}",
+                    $"alert:{kind}")
+            })
+            .ToList();
+
+        rows.Add(new List<InlineKeyboardButton> { InlineKeyboardButton.Create("⬅️ Назад", "settings") });
+        return new InlineKeyboardMarkup { InlineKeyboard = rows };
     }
 
     public static InlineKeyboardMarkup Parents(IReadOnlyList<long> parents, long currentChatId)

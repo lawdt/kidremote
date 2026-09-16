@@ -53,6 +53,14 @@ internal sealed class AppConfig
     [JsonPropertyName("autostart")]
     public bool Autostart { get; set; } = true;
 
+    /// <summary>Персональные настройки уведомлений, ключ — chat id родителя.</summary>
+    [JsonPropertyName("alerts")]
+    public Dictionary<string, AlertSettings> Alerts { get; set; } = new();
+
+    /// <summary>Сколько времени остаётся после включения или пробуждения компьютера, секунды.</summary>
+    [JsonPropertyName("resumeGrantSeconds")]
+    public int ResumeGrantSeconds { get; set; } = 60;
+
     /// <summary>Пароль на пункты меню в трее. Хранится как соль и хэш, сам пароль нигде не лежит.</summary>
     [JsonPropertyName("adminPassword")]
     public string AdminPasswordHash { get; set; } = string.Empty;
@@ -135,6 +143,17 @@ internal sealed class AppConfig
     }
 
     public bool VerifyPassword(string password) => PasswordHash.Verify(password, AdminPasswordHash);
+
+    /// <summary>Настройки уведомлений родителя. Новому чату всё включено.</summary>
+    public AlertSettings GetAlerts(long chatId)
+    {
+        var key = chatId.ToString();
+        if (Alerts.TryGetValue(key, out var settings)) return settings;
+
+        settings = new AlertSettings();
+        Alerts[key] = settings;
+        return settings;
+    }
 
     public bool IsParent(long chatId) => ParentChatIds.Contains(chatId);
 

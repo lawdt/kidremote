@@ -38,6 +38,9 @@ internal sealed class ActivityMonitor : IDisposable
 
     public event Action? Resumed;
 
+    /// <summary>Только выход из сна, без разблокировки сессии.</summary>
+    public event Action? SystemResumed;
+
     public ActivityMonitor(AppConfig config)
     {
         _config = config;
@@ -146,6 +149,7 @@ internal sealed class ActivityMonitor : IDisposable
             case PowerModes.Resume:
                 _systemAwake = true;
                 Resumed?.Invoke();
+                SystemResumed?.Invoke();
                 break;
         }
     }

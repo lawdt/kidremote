@@ -404,6 +404,35 @@ internal sealed partial class BotService : IDisposable
                 return;
             }
 
+            case "alerts":
+            {
+                MarkBusy(chatId, true);
+                await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                await ShowAlertsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "alert":
+            {
+                if (parts.Length > 1 && Enum.TryParse<AlertKind>(parts[1], out var kind))
+                {
+                    var settings = _config.GetAlerts(chatId);
+                    settings.Toggle(kind);
+                    _config.Save();
+
+                    await _client.AnswerCallbackAsync(callback.Id,
+                        $"{AlertSettings.Caption(kind)}: {(settings.IsEnabled(kind) ? "включено" : "выключено")}",
+                        ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _client.AnswerCallbackAsync(callback.Id, null, ct).ConfigureAwait(false);
+                }
+
+                await ShowAlertsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
             case "idle":
             {
                 if (parts.Length > 1 && int.TryParse(parts[1], out var seconds))
@@ -674,17 +703,20 @@ internal sealed partial class BotService : IDisposable
 
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
+            if (!_config.GetAlerts(chatId).IsEnabled(AlertKind.TimeUp)) continue;
             await _client.SendMessageAsync(chatId, text, Keyboards.QuickAdd(), ct).ConfigureAwait(false);
         }
     }
 
-    public async Task NotifyAsync(string text)
+    /// <summary>Рассылает только тем родителям, у кого этот повод не выключен.</summary>
+    public async Task NotifyAsync(AlertKind kind, string text)
     {
         var ct = _cts.Token;
         if (ct.IsCancellationRequested) return;
 
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
+            if (!_config.GetAlerts(chatId).IsEnabled(kind)) continue;
             await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
         }
     }
@@ -694,6 +726,7 @@ internal sealed partial class BotService : IDisposable
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
             if (chatId == exceptChatId) continue;
+            if (!_config.GetAlerts(chatId).IsEnabled(AlertKind.System)) continue;
             await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
         }
     }
@@ -717,6 +750,25 @@ internal sealed partial class BotService : IDisposable
         RememberPanel(chatId, messageId);
         _lastPanelText = BuildStatusText();
         await EditAsync(chatId, messageId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+    }
+
+    private async Task ShowAlertsAsync(long chatId, long messageId, CancellationToken ct)
+    {
+        if (messageId == 0) return;
+
+        MarkBusy(chatId, true);
+        await EditAsync(chatId, messageId, BuildAlertsText(),
+            Keyboards.Alerts(_config.GetAlerts(chatId)), ct).ConfigureAwait(false);
+    }
+
+    private static string BuildAlertsText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>Мои уведомления</b>");
+        sb.AppendLine();
+        sb.AppendLine("Настройки личные: у второго родителя свой набор.");
+        sb.AppendLine("Колокольчик — сообщения приходят, перечёркнутый — нет.");
+        return sb.ToString().TrimEnd();
     }
 
     private async Task ShowSettingsAsync(long chatId, long messageId, CancellationToken ct)

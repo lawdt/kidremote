@@ -83,6 +83,7 @@ public partial class App : Application
         _bank.Changed += OnBankChanged;
 
         _activity = new ActivityMonitor(_config);
+        _activity.SystemResumed += OnSystemResumed;
         _overlay = new OverlayManager(_config);
 
         _countdown = new CountdownWindow(_config);
@@ -105,12 +106,51 @@ public partial class App : Application
         if (_config.WatchdogEnabled) Watchdog.EnsureGuardRunning();
 
         StartTimers();
+        ApplyResumeGrant();
         RenderAll(force: true);
+
+        _ = _bot.NotifyAsync(AlertKind.Startup, BuildResumeText("💻 Компьютер включён"));
 
         _tray.ShowMessage("KidRemote",
             _config.NeedsParentBinding
                 ? "Напишите боту любое сообщение — этот чат станет родительским."
                 : "Работает. Значок в трее показывает остаток времени.");
+    }
+
+    /// <summary>
+    /// После включения и пробуждения накопленное время не возвращается: остаётся короткая фора,
+    /// чтобы ребёнок не получил час игры, просто разбудив компьютер.
+    /// </summary>
+    private void ApplyResumeGrant()
+    {
+        if (_bank.IsUnlimited) return;
+
+        var grant = Math.Max(0, _config.ResumeGrantSeconds);
+        if (_bank.RemainingSeconds <= grant) return;
+
+        _bank.Set(grant);
+        Persist();
+    }
+
+    private string BuildResumeText(string headline)
+    {
+        var remaining = _bank.IsUnlimited
+            ? "безлимит"
+            : TimeFormat.Human(_bank.RemainingSeconds);
+
+        return $"{headline}\nОсталось: {remaining}";
+    }
+
+    private void OnSystemResumed()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            ApplyResumeGrant();
+            RenderAll(force: true);
+
+            _ = _bot.NotifyAsync(AlertKind.Wake, BuildResumeText("⏰ Компьютер проснулся"));
+            _ = _bot.RefreshPanelsAsync(force: true);
+        });
     }
 
     private void StartGuardMode()
@@ -224,7 +264,7 @@ public partial class App : Application
 
         // Предупреждение родителям ровно один раз, на пересечении порога.
         if (valueChanged && state == BankState.Running && remaining == _config.WarnSeconds)
-            _ = _bot.NotifyAsync($"⏳ У ребёнка осталось {TimeFormat.Human(remaining)}.");
+            _ = _bot.NotifyAsync(AlertKind.Warning, $"⏳ У ребёнка осталось {TimeFormat.Human(remaining)}.");
 
         _lastRenderedSeconds = remaining;
     }
@@ -328,7 +368,7 @@ public partial class App : Application
 
             Persist();
             _ = _bot.RefreshPanelsAsync(force: true);
-            _ = _bot.NotifyAsync("🔓 Разблокировано с компьютера по паролю.");
+            _ = _bot.NotifyAsync(AlertKind.System, "🔓 Разблокировано с компьютера по паролю.");
         }
         finally
         {
@@ -351,7 +391,7 @@ public partial class App : Application
         // Даём уведомлению шанс уйти до того, как процесс завершится.
         try
         {
-            _bot.NotifyAsync("🚪 KidRemote закрыт с компьютера.").Wait(TimeSpan.FromSeconds(3));
+            _bot.NotifyAsync(AlertKind.System, "🚪 KidRemote закрыт с компьютера.").Wait(TimeSpan.FromSeconds(3));
         }
         catch
         {
