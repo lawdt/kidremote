@@ -240,7 +240,9 @@ internal sealed partial class BotService : IDisposable
         {
             _config.AddParent(chatId);
             await _client.SendMessageAsync(chatId,
-                "Готово, этот чат привязан как родительский.\n\nВторого родителя добавьте кнопкой «👪 Родители».",
+                "Готово, этот чат привязан как родительский.\n\n" +
+                "Уведомления выключены — включить нужные можно в «⚙️ Настройки» → «🔔 Мои уведомления».\n\n" +
+                "Второго родителя добавьте кнопкой «👪 Родители».",
                 Keyboards.Persistent(), ct).ConfigureAwait(false);
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
             return;
@@ -768,6 +770,8 @@ internal sealed partial class BotService : IDisposable
         sb.AppendLine();
         sb.AppendLine("Настройки личные: у второго родителя свой набор.");
         sb.AppendLine("Колокольчик — сообщения приходят, перечёркнутый — нет.");
+        sb.AppendLine();
+        sb.AppendLine("Изначально выключено всё. Панель управления обновляется в любом случае.");
         return sb.ToString().TrimEnd();
     }
 

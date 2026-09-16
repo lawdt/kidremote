@@ -21,23 +21,26 @@ internal enum AlertKind
     System
 }
 
-/// <summary>Какие уведомления получает конкретный родитель.</summary>
+/// <summary>
+/// Какие уведомления получает конкретный родитель. По умолчанию выключено всё:
+/// поток сообщений включается осознанно, а не сваливается сразу после привязки.
+/// </summary>
 internal sealed class AlertSettings
 {
     [JsonPropertyName("timeUp")]
-    public bool TimeUp { get; set; } = true;
+    public bool TimeUp { get; set; }
 
     [JsonPropertyName("warning")]
-    public bool Warning { get; set; } = true;
+    public bool Warning { get; set; }
 
     [JsonPropertyName("wake")]
-    public bool Wake { get; set; } = true;
+    public bool Wake { get; set; }
 
     [JsonPropertyName("startup")]
-    public bool Startup { get; set; } = true;
+    public bool Startup { get; set; }
 
     [JsonPropertyName("system")]
-    public bool System { get; set; } = true;
+    public bool System { get; set; }
 
     public bool IsEnabled(AlertKind kind) => kind switch
     {
