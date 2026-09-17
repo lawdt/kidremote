@@ -162,7 +162,11 @@ public partial class LockOverlayWindow : Window
         SchedulePanel.Visibility = Visibility.Visible;
     }
 
-    private void OnMessageClick(object sender, RoutedEventArgs e) => MessageRequested?.Invoke();
+    private void OnMessageClick(object sender, RoutedEventArgs e)
+    {
+        Core.Log.Write("экран блокировки: нажата кнопка сообщения");
+        MessageRequested?.Invoke();
+    }
 
     /// <summary>Кнопка нужна только на основном мониторе, на остальных она лишняя.</summary>
     internal void HideMessageButton() => MessageButton.Visibility = Visibility.Collapsed;

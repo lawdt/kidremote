@@ -65,6 +65,9 @@ internal sealed class OverlayManager : IDisposable
 
     public bool IsVisible => _visible;
 
+    /// <summary>Окно на основном мониторе — владелец диалогов, открываемых поверх блокировки.</summary>
+    public Window? PrimaryWindow => _windows.Count > 0 ? _windows[0] : null;
+
     public void Show()
     {
         if (_visible) return;
@@ -156,19 +159,33 @@ internal sealed class OverlayManager : IDisposable
         _windows.Clear();
     }
 
-    /// <summary>Возвращает окна наверх, если что-то успело перекрыть их.</summary>
+    /// <summary>
+    /// Возвращает окна наверх, если что-то успело перекрыть их. Пока впереди наше же окно,
+    /// фокус не трогаем: иначе постоянная переактивация сбивает нажатие кнопки.
+    /// </summary>
     private void Reassert()
     {
         foreach (var window in _windows)
         {
             if (!window.Topmost) window.Topmost = true;
-
-            var handle = new WindowInteropHelper(window).Handle;
-            if (handle != IntPtr.Zero) NativeMethods.SetForegroundWindow(handle);
         }
 
         if (_windows.Count > 0 && _windows[0].WindowState == WindowState.Minimized)
             _windows[0].WindowState = WindowState.Normal;
+
+        if (IsOwnWindowActive()) return;
+
+        var primary = _windows.Count > 0 ? new WindowInteropHelper(_windows[0]).Handle : IntPtr.Zero;
+        if (primary != IntPtr.Zero) NativeMethods.SetForegroundWindow(primary);
+    }
+
+    private bool IsOwnWindowActive()
+    {
+        var foreground = NativeMethods.GetForegroundWindow();
+        if (foreground == IntPtr.Zero) return false;
+
+        NativeMethods.GetWindowThreadProcessId(foreground, out var pid);
+        return pid == (uint)Environment.ProcessId;
     }
 
     public void Dispose()

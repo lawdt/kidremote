@@ -349,7 +349,7 @@ public partial class App : Application
 
         try
         {
-            var window = new MessageWindow();
+            var window = new MessageWindow { Owner = _overlay.PrimaryWindow };
             if (window.ShowDialog() != true) return;
 
             var text = window.Text;
