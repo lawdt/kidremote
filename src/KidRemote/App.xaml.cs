@@ -435,6 +435,9 @@ public partial class App : Application
         {
             _overlay.SetChat(_chat.Tail(50));
 
+            // Ответ легко пропустить и на закрытом экране, и в игре — обозначаем звуком.
+            Alarm.Message();
+
             // На закрытом экране реплика уже видна в углу — карточка поверх была бы лишней
             // и мешала бы удержанию блокировки наверху.
             if (_overlay.IsVisible) return;

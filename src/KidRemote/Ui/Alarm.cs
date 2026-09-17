@@ -13,12 +13,16 @@ internal static class Alarm
 
     private static readonly Lazy<SoundPlayer?> Soft = new(() => Build(new[] { 880.0, 1175.0 }, 130, 0.20));
     private static readonly Lazy<SoundPlayer?> Urgent = new(() => Build(new[] { 1568.0, 1568.0 }, 90, 0.28));
+    private static readonly Lazy<SoundPlayer?> Chime = new(() => Build(new[] { 659.3, 987.8 }, 150, 0.18));
 
     /// <summary>Мягкий сигнал на переходе минуты в жёлтой зоне.</summary>
     public static void Minute() => Play(Soft.Value);
 
     /// <summary>Резкий сигнал на последней минуте.</summary>
     public static void LastMinute() => Play(Urgent.Value);
+
+    /// <summary>Мягкий сигнал о сообщении от родителя.</summary>
+    public static void Message() => Play(Chime.Value);
 
     private static void Play(SoundPlayer? player)
     {
