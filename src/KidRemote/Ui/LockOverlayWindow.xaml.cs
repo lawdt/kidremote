@@ -50,7 +50,6 @@ public partial class LockOverlayWindow : Window
 
         BuildEmojiPanel();
         EmojiButton.Content = EmojiButtonContent("🙂");
-        SendButton.Content = EmojiButtonContent("✈️");
 
         // Отступы по умолчанию у абзаца делают поле выше, чем нужно.
         ChatInput.Document.PagePadding = new Thickness(0);

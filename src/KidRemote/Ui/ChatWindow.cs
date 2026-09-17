@@ -116,7 +116,7 @@ internal sealed class ChatWindow : Window
 
         var sendButton = new Button
         {
-            Content = EmojiContent("✈️", 20),
+            Content = SendIcon(),
             Width = 56,
             MinHeight = 44,
             Margin = new Thickness(8, 0, 0, 0),
@@ -227,6 +227,16 @@ internal sealed class ChatWindow : Window
         _input.Document.Blocks.Add(new Paragraph { Margin = new Thickness(0) });
         _input.CaretPosition = _input.Document.ContentEnd;
     }
+
+    /// <summary>Самолётик рисуем фигурой: эмодзи в кнопке выходит неровным.</summary>
+    private static System.Windows.Shapes.Path SendIcon() => new()
+    {
+        Data = Geometry.Parse("M2,21 L23,12 L2,3 L2,10 L17,12 L2,14 Z"),
+        Fill = new SolidColorBrush(Color.FromRgb(0x7F, 0xC5, 0xFF)),
+        Stretch = Stretch.Uniform,
+        Width = 20,
+        Height = 20
+    };
 
     private static object EmojiContent(string emoji, double size)
     {

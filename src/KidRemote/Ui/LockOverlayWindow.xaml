@@ -98,7 +98,13 @@
                         BorderThickness="1"
                         Cursor="Hand"
                         Focusable="False"
-                        Click="OnSendClick"/>
+                        Click="OnSendClick">
+                    <Path Data="M2,21 L23,12 L2,3 L2,10 L17,12 L2,14 Z"
+                          Fill="#7FC5FF"
+                          Stretch="Uniform"
+                          Width="22"
+                          Height="22"/>
+                </Button>
 
                 <RichTextBox x:Name="ChatInput"
                              FontFamily="Consolas, Courier New"
