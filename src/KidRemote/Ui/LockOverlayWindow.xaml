@@ -12,6 +12,15 @@
 
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock x:Name="Clock"
+                       Text=""
+                       FontFamily="Segoe UI"
+                       FontSize="64"
+                       FontWeight="Light"
+                       Foreground="#5D6C94"
+                       Margin="0,0,0,28"
+                       HorizontalAlignment="Center"/>
+
             <TextBlock x:Name="Glyph"
                        Text=""
                        FontSize="72"
@@ -35,6 +44,18 @@
                        FontSize="22"
                        Foreground="#8FA0C8"
                        Margin="0,16,0,0"
+                       HorizontalAlignment="Center"/>
+
+            <TextBlock x:Name="HealthNote"
+                       Text=""
+                       FontFamily="Segoe UI"
+                       FontSize="17"
+                       Foreground="#C9A227"
+                       MaxWidth="760"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Margin="0,32,0,0"
+                       Visibility="Collapsed"
                        HorizontalAlignment="Center"/>
 
             <Button x:Name="MessageButton"

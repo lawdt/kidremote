@@ -17,6 +17,7 @@ internal sealed class OverlayManager : IDisposable
     private readonly KeyboardBlocker _keyboard = new();
     private readonly List<LockOverlayWindow> _windows = new();
     private readonly DispatcherTimer _keepOnTop;
+    private readonly DispatcherTimer _clock;
 
     /// <summary>Ребёнок попросил написать родителям с экрана блокировки.</summary>
     public event Action? MessageRequested;
@@ -32,6 +33,32 @@ internal sealed class OverlayManager : IDisposable
             Interval = TimeSpan.FromMilliseconds(700)
         };
         _keepOnTop.Tick += (_, _) => Reassert();
+
+        _clock = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _clock.Tick += (_, _) => UpdateClock();
+    }
+
+    /// <summary>Поздний вечер и ночь считаем через полночь: с 21 до 9 — это два куска суток.</summary>
+    private bool IsLateHour(DateTime now)
+    {
+        var from = _config.LateHourFrom;
+        var to = _config.LateHourTo;
+        if (from == to) return false;
+
+        return from < to
+            ? now.Hour >= from && now.Hour < to
+            : now.Hour >= from || now.Hour < to;
+    }
+
+    private void UpdateClock()
+    {
+        var now = DateTime.Now;
+        var late = IsLateHour(now);
+
+        foreach (var window in _windows) window.UpdateClock(now, late);
     }
 
     public bool IsVisible => _visible;
@@ -67,8 +94,11 @@ internal sealed class OverlayManager : IDisposable
             _windows.Add(window);
         }
 
+        UpdateClock();
+
         if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
         _keepOnTop.Start();
+        _clock.Start();
         Reassert();
     }
 
@@ -81,6 +111,7 @@ internal sealed class OverlayManager : IDisposable
         if (!_visible) return;
 
         _keepOnTop.Stop();
+        _clock.Stop();
         _keyboard.Disable();
 
         foreach (var window in _windows) window.Topmost = false;
@@ -92,8 +123,11 @@ internal sealed class OverlayManager : IDisposable
 
         foreach (var window in _windows) window.Topmost = true;
 
+        UpdateClock();
+
         if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
         _keepOnTop.Start();
+        _clock.Start();
         Reassert();
     }
 
@@ -103,6 +137,7 @@ internal sealed class OverlayManager : IDisposable
         _visible = false;
 
         _keepOnTop.Stop();
+        _clock.Stop();
         _keyboard.Disable();
 
         foreach (var window in _windows) window.CloseForReal();

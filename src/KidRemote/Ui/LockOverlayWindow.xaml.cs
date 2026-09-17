@@ -55,6 +55,20 @@ public partial class LockOverlayWindow : Window
         });
     }
 
+    private const string HealthText =
+        "Играть в это время врачи не рекомендуют: поздние игры сбивают сон и бьют по самочувствию на следующий день.";
+
+    /// <summary>Часы и ночная приписка. Вызывается раз в секунду, пока экран закрыт.</summary>
+    internal void UpdateClock(DateTime now, bool lateHours)
+    {
+        Clock.Text = now.ToString("HH:mm");
+
+        var note = lateHours ? HealthText : string.Empty;
+        if (HealthNote.Text != note) HealthNote.Text = note;
+
+        HealthNote.Visibility = lateHours ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void OnMessageClick(object sender, RoutedEventArgs e) => MessageRequested?.Invoke();
 
     /// <summary>Кнопка нужна только на основном мониторе, на остальных она лишняя.</summary>

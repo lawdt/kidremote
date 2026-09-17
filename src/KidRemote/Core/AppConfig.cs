@@ -17,6 +17,14 @@ internal sealed class AppConfig
     [JsonPropertyName("parentChatIds")]
     public List<long> ParentChatIds { get; set; } = new();
 
+    /// <summary>Час, с которого на экране блокировки появляется приписка о вреде поздних игр.</summary>
+    [JsonPropertyName("lateHourFrom")]
+    public int LateHourFrom { get; set; } = 21;
+
+    /// <summary>Час, до которого действует та же приписка.</summary>
+    [JsonPropertyName("lateHourTo")]
+    public int LateHourTo { get; set; } = 9;
+
     /// <summary>Фора после запуска игры: столько секунд отсчёт ещё не идёт.</summary>
     [JsonPropertyName("gameStartDelaySeconds")]
     public int GameStartDelaySeconds { get; set; } = 10;
