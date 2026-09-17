@@ -52,6 +52,12 @@ internal sealed class TrayIcon : IDisposable
             Icon = LoadBaseIcon()
         };
 
+        // Левый клик — сразу чат: до родителей должно быть одно движение.
+        _icon.MouseClick += (_, args) =>
+        {
+            if (args.Button == Forms.MouseButtons.Left) MessageRequested?.Invoke();
+        };
+
         // Visible выставляем после назначения иконки: без неё оболочка иногда не создаёт значок.
         _icon.Visible = true;
     }
