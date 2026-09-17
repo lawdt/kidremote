@@ -265,6 +265,16 @@ public partial class LockOverlayWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7))
         });
 
+        if (!message.FromParent)
+        {
+            line.Inlines.Add(new Run(message.Delivered ? "  ✓✓" : "  ⏳")
+            {
+                Foreground = new SolidColorBrush(message.Delivered
+                    ? Color.FromRgb(0x4E, 0xA8, 0x7A)
+                    : Color.FromRgb(0x7E, 0x6B, 0x3A))
+            });
+        }
+
         return line;
     }
 

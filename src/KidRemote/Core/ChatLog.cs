@@ -6,6 +6,10 @@ namespace KidRemote.Core;
 
 internal sealed class ChatMessage
 {
+    /// <summary>Локальный идентификатор — по нему помечаем доставку.</summary>
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
     [JsonPropertyName("time")]
     public DateTime Time { get; set; }
 
@@ -18,6 +22,10 @@ internal sealed class ChatMessage
     /// <summary>Написал родитель из Telegram, а не ребёнок с компьютера.</summary>
     [JsonPropertyName("fromParent")]
     public bool FromParent { get; set; }
+
+    /// <summary>Реплика ребёнка ушла в Telegram. Пока нет — лежит в очереди и повторяется.</summary>
+    [JsonPropertyName("delivered")]
+    public bool Delivered { get; set; }
 }
 
 /// <summary>
@@ -33,6 +41,9 @@ internal sealed class ChatLog
     private readonly List<ChatMessage> _messages = new();
 
     public event Action<ChatMessage>? Added;
+
+    /// <summary>Переписка изменилась: пришло сообщение или сменился признак доставки.</summary>
+    public event Action? Changed;
 
     public ChatLog() => Load();
 
@@ -52,14 +63,17 @@ internal sealed class ChatLog
         }
     }
 
-    public void Add(string author, string text, bool fromParent)
+    public ChatMessage Add(string author, string text, bool fromParent)
     {
         var message = new ChatMessage
         {
+            Id = DateTime.UtcNow.Ticks,
             Time = DateTime.Now,
             Author = author,
             Text = text,
-            FromParent = fromParent
+            FromParent = fromParent,
+            // Реплика родителя уже у нас на экране, доставлять её никуда не нужно.
+            Delivered = fromParent
         };
 
         lock (_sync)
@@ -70,6 +84,32 @@ internal sealed class ChatLog
 
         Save();
         Added?.Invoke(message);
+        Changed?.Invoke();
+
+        return message;
+    }
+
+    /// <summary>Реплики ребёнка, которые ещё не ушли в Telegram, от старых к новым.</summary>
+    public IReadOnlyList<ChatMessage> Pending()
+    {
+        lock (_sync)
+        {
+            return _messages.Where(message => !message.FromParent && !message.Delivered).ToList();
+        }
+    }
+
+    public void MarkDelivered(long id)
+    {
+        lock (_sync)
+        {
+            var message = _messages.FirstOrDefault(item => item.Id == id);
+            if (message is null || message.Delivered) return;
+
+            message.Delivered = true;
+        }
+
+        Save();
+        Changed?.Invoke();
     }
 
     private void Load()

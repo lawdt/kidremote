@@ -33,6 +33,7 @@ internal sealed partial class BotService : IDisposable
     private readonly TelegramClient _client;
     private readonly CancellationTokenSource _cts = new();
     private readonly Dictionary<long, Draft> _drafts = new();
+    private readonly SemaphoreSlim _outbox = new(1, 1);
 
     /// <summary>Чаты, где сейчас открыт экран подтверждения или настройки: их нельзя затирать автообновлением.</summary>
     private readonly HashSet<long> _busyChats = new();
@@ -92,6 +93,8 @@ internal sealed partial class BotService : IDisposable
                 }
 
                 if (updates.Count > 0) _store.Save(_state);
+
+                await FlushOutboxAsync(ct).ConfigureAwait(false);
                 backoff = TimeSpan.FromSeconds(1);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -766,25 +769,45 @@ internal sealed partial class BotService : IDisposable
     }
 
     /// <summary>
-    /// Сообщение от ребёнка. Уходит всем родителям независимо от настроек уведомлений:
-    /// это не системное событие, а живая просьба.
+    /// Отправляет накопленные реплики ребёнка. Пока Telegram недоступен, они остаются
+    /// в очереди и уходят при первой же возможности — молча теряться сообщения не должны.
     /// </summary>
-    public async Task SendFromChildAsync(string message, bool alreadyLogged = false)
+    public async Task FlushOutboxAsync(CancellationToken ct)
     {
-        var ct = _cts.Token;
-        if (ct.IsCancellationRequested) return;
+        if (_config.ParentChatIds.Count == 0) return;
+        if (!await _outbox.WaitAsync(0, ct).ConfigureAwait(false)) return;
 
-        if (!alreadyLogged) _chat.Add("Ребёнок", message, fromParent: false);
-
-        var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message)}\n\n" +
-                   "<i>Просто напишите ответ — он появится у него на экране.</i>";
-
-        // Без кнопок добавления времени: это разговор, а не повод выдавать минуты.
-        foreach (var chatId in _config.ParentChatIds.ToArray())
+        try
         {
-            await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
+            foreach (var message in _chat.Pending())
+            {
+                if (ct.IsCancellationRequested) return;
+
+                var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message.Text)}\n\n" +
+                           "<i>Просто напишите ответ — он появится у него на экране.</i>";
+
+                var delivered = false;
+
+                // Без кнопок добавления времени: это разговор, а не повод выдавать минуты.
+                foreach (var chatId in _config.ParentChatIds.ToArray())
+                {
+                    if (await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false) is not null)
+                        delivered = true;
+                }
+
+                if (!delivered) return;
+
+                _chat.MarkDelivered(message.Id);
+            }
+        }
+        finally
+        {
+            _outbox.Release();
         }
     }
+
+    /// <summary>Просит отправить очередь прямо сейчас, не дожидаясь следующего цикла.</summary>
+    public void PokeOutbox() => _ = FlushOutboxAsync(_cts.Token);
 
     /// <summary>Текст ребёнка попадает в разметку, поэтому угловые скобки экранируем.</summary>
     private static string Escape(string value) =>
@@ -1067,6 +1090,7 @@ internal sealed partial class BotService : IDisposable
     {
         _cts.Cancel();
         _cts.Dispose();
+        _outbox.Dispose();
         _client.Dispose();
     }
 }

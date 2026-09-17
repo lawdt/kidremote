@@ -111,6 +111,7 @@ public partial class App : Application
 
         _chat = new ChatLog();
         _chat.Added += OnChatMessage;
+        _chat.Changed += () => Dispatcher.BeginInvoke(() => _overlay.SetChat(_chat.Tail(50)));
 
         _schedule = new ScheduleService(_config);
         _schedule.Updated += OnScheduleUpdated;
@@ -390,8 +391,7 @@ public partial class App : Application
         _lastChildMessageUtc = DateTime.UtcNow;
         _chat.Add("Ребёнок", text, fromParent: false);
         _overlay.ClearChatInput();
-        _overlay.SetChat(_chat.Tail(50));
-        _ = _bot.SendFromChildAsync(text, alreadyLogged: true);
+        _bot.PokeOutbox();
     }
 
     /// <summary>Чат с родителями. Пароля не требует — просить о помощи должно быть просто.</summary>
@@ -420,8 +420,8 @@ public partial class App : Application
             }
 
             _lastChildMessageUtc = DateTime.UtcNow;
-            _ = _bot.SendFromChildAsync(text);
-            _tray.ShowMessage("KidRemote", "Сообщение отправлено.");
+            _chat.Add("Ребёнок", text, fromParent: false);
+            _bot.PokeOutbox();
         }
         catch (Exception ex)
         {
