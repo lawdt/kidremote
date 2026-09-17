@@ -61,7 +61,7 @@
         <StackPanel x:Name="ChatPanel"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
-                    Width="640"
+                    Width="720"
                     Margin="0,0,56,0"
                     Visibility="Collapsed">
             <TextBlock Text="Чат с родителями"
@@ -76,7 +76,7 @@
                     CornerRadius="4"
                     Padding="14,10">
                 <ScrollViewer x:Name="ChatScroll"
-                              MaxHeight="340"
+                              MaxHeight="520"
                               VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="ChatLines"/>
                 </ScrollViewer>

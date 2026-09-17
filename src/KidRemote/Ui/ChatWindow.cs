@@ -25,8 +25,8 @@ internal sealed class ChatWindow : Window
         _chat = chat;
 
         Title = "KidRemote";
-        Width = 520;
-        Height = 560;
+        Width = 640;
+        Height = 720;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.NoResize;
         Topmost = true;
