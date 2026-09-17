@@ -23,9 +23,20 @@ internal sealed class ChatMessage
     [JsonPropertyName("fromParent")]
     public bool FromParent { get; set; }
 
-    /// <summary>Реплика ребёнка ушла в Telegram. Пока нет — лежит в очереди и повторяется.</summary>
+    /// <summary>
+    /// Признак доставки в том виде, в каком лежит в файле. Отсутствует у записей,
+    /// сделанных до появления очереди, — такие считаем доставленными, иначе вся
+    /// прежняя переписка уедет родителям повторно.
+    /// </summary>
     [JsonPropertyName("delivered")]
-    public bool Delivered { get; set; }
+    public bool? DeliveredFlag { get; set; }
+
+    [JsonIgnore]
+    public bool Delivered
+    {
+        get => DeliveredFlag ?? true;
+        set => DeliveredFlag = value;
+    }
 }
 
 /// <summary>
@@ -126,6 +137,13 @@ internal sealed class ChatLog
             {
                 _messages.Clear();
                 _messages.AddRange(restored);
+
+                // У старых записей нет идентификатора: без него отметить доставку невозможно.
+                foreach (var message in _messages)
+                {
+                    if (message.Id == 0) message.Id = message.Time.Ticks;
+                    message.DeliveredFlag ??= true;
+                }
             }
         }
         catch

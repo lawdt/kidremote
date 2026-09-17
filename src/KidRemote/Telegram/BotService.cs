@@ -14,6 +14,9 @@ internal sealed partial class BotService : IDisposable
     private const int MaxDraftMinutes = 600;
     private static readonly TimeSpan InviteLifetime = TimeSpan.FromMinutes(15);
 
+    /// <summary>Дольше этого срока недоставленную реплику отправлять уже незачем.</summary>
+    private static readonly TimeSpan OutboxLifetime = TimeSpan.FromHours(6);
+
     /// <summary>Черновик точного значения: сколько минут набрано и что с ними сделать.</summary>
     private sealed class Draft
     {
@@ -782,6 +785,13 @@ internal sealed partial class BotService : IDisposable
             foreach (var message in _chat.Pending())
             {
                 if (ct.IsCancellationRequested) return;
+
+                // Просьба «дай ещё десять минут» через шесть часов уже бессмысленна.
+                if (DateTime.Now - message.Time > OutboxLifetime)
+                {
+                    _chat.MarkDelivered(message.Id);
+                    continue;
+                }
 
                 var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message.Text)}\n\n" +
                            "<i>Просто напишите ответ — он появится у него на экране.</i>";
