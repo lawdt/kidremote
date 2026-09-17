@@ -17,6 +17,23 @@ internal sealed class AppConfig
     [JsonPropertyName("parentChatIds")]
     public List<long> ParentChatIds { get; set; } = new();
 
+    /// <summary>Показывать на экране блокировки расписание на завтра.</summary>
+    [JsonPropertyName("scheduleEnabled")]
+    public bool ScheduleEnabled { get; set; } = true;
+
+    [JsonPropertyName("scheduleUrl")]
+    public string ScheduleUrl { get; set; } = "https://compass-bar-schedule.netlify.app/api/schedule";
+
+    [JsonPropertyName("scheduleClass")]
+    public string ScheduleClass { get; set; } = "5";
+
+    [JsonPropertyName("scheduleProgramme")]
+    public string ScheduleProgramme { get; set; } = "ru";
+
+    /// <summary>Как часто перечитывать расписание, минуты.</summary>
+    [JsonPropertyName("scheduleRefreshMinutes")]
+    public int ScheduleRefreshMinutes { get; set; } = 5;
+
     /// <summary>Час, с которого на экране блокировки появляется приписка о вреде поздних игр.</summary>
     [JsonPropertyName("lateHourFrom")]
     public int LateHourFrom { get; set; } = 21;

@@ -24,6 +24,8 @@ internal sealed class OverlayManager : IDisposable
 
     private bool _visible;
     private string _phrase = string.Empty;
+    private string _scheduleTitle = string.Empty;
+    private IReadOnlyList<string> _scheduleLines = Array.Empty<string>();
 
     public OverlayManager(AppConfig config)
     {
@@ -88,6 +90,8 @@ internal sealed class OverlayManager : IDisposable
             window.BindToScreen(screen);
             window.Render(_phrase);
 
+            window.ShowSchedule(_scheduleTitle, _scheduleLines);
+
             if (screen.Primary) window.MessageRequested += () => MessageRequested?.Invoke();
             else window.HideMessageButton();
 
@@ -129,6 +133,14 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+    }
+
+    public void SetSchedule(string title, IReadOnlyList<string> lines)
+    {
+        _scheduleTitle = title;
+        _scheduleLines = lines;
+
+        foreach (var window in _windows) window.ShowSchedule(title, lines);
     }
 
     public void Hide()

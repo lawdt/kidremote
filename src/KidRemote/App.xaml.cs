@@ -37,6 +37,7 @@ public partial class App : Application
     private CountdownWindow _countdown = null!;
     private AlertFrameWindow _frame = null!;
     private OverlayManager _overlay = null!;
+    private ScheduleService _schedule = null!;
     private HotkeyListener _hotkey = null!;
 
     private readonly Stopwatch _tickWatch = Stopwatch.StartNew();
@@ -372,6 +373,9 @@ public partial class App : Application
         _ => true
     };
 
+    private void OnScheduleUpdated() =>
+        Dispatcher.BeginInvoke(() => _overlay.SetSchedule(_schedule.Title, _schedule.Lines));
+
     private void OnCountdownModeChanged(CountdownMode mode)
     {
         _config.CountdownMode = mode;
@@ -566,6 +570,7 @@ public partial class App : Application
         }
 
         _bot?.Dispose();
+        _schedule?.Dispose();
         _hotkey?.Dispose();
         _overlay?.Dispose();
         _tray?.Dispose();

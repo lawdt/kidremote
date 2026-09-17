@@ -24,6 +24,31 @@
             </TextBlock>
         </Canvas>
 
+        <StackPanel x:Name="SchedulePanel"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Bottom"
+                    Margin="56,0,0,56"
+                    Visibility="Collapsed">
+            <TextBlock x:Name="ScheduleTitle"
+                       Text=""
+                       FontFamily="Segoe UI"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="#7E8DB5"
+                       Margin="0,0,0,10"/>
+            <ItemsControl x:Name="ScheduleList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   FontFamily="Consolas, Courier New"
+                                   FontSize="16"
+                                   Foreground="#9FB0D8"
+                                   Margin="0,0,0,4"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock x:Name="Clock"
                        Text=""

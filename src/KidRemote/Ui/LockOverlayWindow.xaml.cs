@@ -148,6 +148,20 @@ public partial class LockOverlayWindow : Window
         HealthNote.Visibility = lateHours ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>Расписание на завтра в углу экрана.</summary>
+    internal void ShowSchedule(string title, IReadOnlyList<string> lines)
+    {
+        if (lines.Count == 0 || title.Length == 0)
+        {
+            SchedulePanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ScheduleTitle.Text = title;
+        ScheduleList.ItemsSource = lines;
+        SchedulePanel.Visibility = Visibility.Visible;
+    }
+
     private void OnMessageClick(object sender, RoutedEventArgs e) => MessageRequested?.Invoke();
 
     /// <summary>Кнопка нужна только на основном мониторе, на остальных она лишняя.</summary>
