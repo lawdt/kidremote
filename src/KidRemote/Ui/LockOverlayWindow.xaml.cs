@@ -94,8 +94,9 @@ public partial class LockOverlayWindow : Window
         if (distance < 6)
         {
             PickTarget(width, height);
-            // Жук иногда замирает — так он выглядит живым, а не заводным.
-            if (!fleeing && _random.NextDouble() < 0.4) _bugPauseLeft = 0.5 + _random.NextDouble() * 2.5;
+
+            // Настоящая коровка больше сидит, чем ходит: почти всегда делаем долгую паузу.
+            if (!fleeing && _random.NextDouble() < 0.85) _bugPauseLeft = 4 + _random.NextDouble() * 16;
             return;
         }
 
@@ -150,12 +151,29 @@ public partial class LockOverlayWindow : Window
         return true;
     }
 
+    /// <summary>Новая цель неподалёку: короткая перебежка выглядит естественнее броска через весь экран.</summary>
     private void PickTarget(double width, double height)
     {
         const double margin = 40;
+
+        var x = Canvas.GetLeft(Bug);
+        var y = Canvas.GetTop(Bug);
+
+        if (double.IsNaN(x) || double.IsNaN(y))
+        {
+            _bugTarget = new Point(
+                margin + _random.NextDouble() * Math.Max(1, width - margin * 2),
+                margin + _random.NextDouble() * Math.Max(1, height - margin * 2));
+
+            return;
+        }
+
+        var angle = _random.NextDouble() * Math.PI * 2;
+        var distance = 60 + _random.NextDouble() * 160;
+
         _bugTarget = new Point(
-            margin + _random.NextDouble() * Math.Max(1, width - margin * 2),
-            margin + _random.NextDouble() * Math.Max(1, height - margin * 2));
+            Math.Clamp(x + Math.Cos(angle) * distance, margin, Math.Max(margin, width - margin)),
+            Math.Clamp(y + Math.Sin(angle) * distance, margin, Math.Max(margin, height - margin)));
     }
 
     private static double TurnTowards(double current, double target, double maxStep)
