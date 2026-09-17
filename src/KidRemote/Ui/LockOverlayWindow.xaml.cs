@@ -20,6 +20,14 @@ public partial class LockOverlayWindow : Window
     private const double BugFleeRadius = 150;    // на таком расстоянии курсор уже пугает
     private const double BugFleeDistance = 340;  // насколько далеко отбегает
 
+    /// <summary>Чем сейчас занята коровка.</summary>
+    private enum BugMood
+    {
+        Wander,
+        GoingHome,
+        AtHome
+    }
+
     private const string DefaultHint = "напишите родителям и нажмите Enter";
 
     /// <summary>Названия дней и месяцев берём русские независимо от настроек системы.</summary>
@@ -30,6 +38,8 @@ public partial class LockOverlayWindow : Window
     private readonly Random _random = new();
 
     private Point _bugTarget;
+    private Point _bugHome;
+    private BugMood _bugMood = BugMood.Wander;
     private double _bugAngle;
     private double _bugPauseLeft;
     private bool _allowClose;
@@ -70,6 +80,15 @@ public partial class LockOverlayWindow : Window
 
         const double step = 0.033;
 
+        PlaceHome(width, height);
+
+        if (_bugMood == BugMood.AtHome)
+        {
+            // Домой коровка уходит надолго: наружу её выманивает только курсор.
+            if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130)) LeaveHome();
+            return;
+        }
+
         if (_bugPauseLeft > 0)
         {
             _bugPauseLeft -= step;
@@ -93,6 +112,20 @@ public partial class LockOverlayWindow : Window
 
         if (distance < 6)
         {
+            if (_bugMood == BugMood.GoingHome)
+            {
+                EnterHome();
+                return;
+            }
+
+            // Изредка коровка уходит к себе и там отсиживается.
+            if (!fleeing && _random.NextDouble() < 0.18)
+            {
+                _bugMood = BugMood.GoingHome;
+                _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+                return;
+            }
+
             PickTarget(width, height);
 
             // Настоящая коровка больше сидит, чем ходит: почти всегда делаем долгую паузу.
@@ -108,6 +141,50 @@ public partial class LockOverlayWindow : Window
         var move = (fleeing ? BugFleeSpeed : BugSpeed) * step;
         Canvas.SetLeft(Bug, x + dx / distance * move);
         Canvas.SetTop(Bug, y + dy / distance * move);
+    }
+
+    /// <summary>Домик стоит в левом нижнем углу и не мешает ни расписанию, ни чату.</summary>
+    private void PlaceHome(double width, double height)
+    {
+        if (_bugHome.X > 0) return;
+
+        _bugHome = new Point(56, height - 110);
+
+        Canvas.SetLeft(BugHome, _bugHome.X);
+        Canvas.SetTop(BugHome, _bugHome.Y);
+    }
+
+    private void EnterHome()
+    {
+        _bugMood = BugMood.AtHome;
+        _bugPauseLeft = 0;
+        Bug.Visibility = Visibility.Collapsed;
+    }
+
+    private void LeaveHome()
+    {
+        _bugMood = BugMood.Wander;
+        Bug.Visibility = Visibility.Visible;
+
+        Canvas.SetLeft(Bug, _bugHome.X + 40);
+        Canvas.SetTop(Bug, _bugHome.Y - 20);
+
+        _bugTarget = new Point(_bugHome.X + 260, _bugHome.Y - 160);
+    }
+
+    private bool CursorNear(double x, double y, double radius)
+    {
+        try
+        {
+            var screen = Forms.Cursor.Position;
+            var cursor = PointFromScreen(new Point(screen.X, screen.Y));
+
+            return Math.Sqrt(Math.Pow(cursor.X - x, 2) + Math.Pow(cursor.Y - y, 2)) <= radius;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

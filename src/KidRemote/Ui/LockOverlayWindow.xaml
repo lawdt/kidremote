@@ -17,7 +17,7 @@
             <ColumnDefinition x:Name="RightColumn" Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <Canvas x:Name="Bugs" ClipToBounds="True" Grid.ColumnSpan="3">
+
             <!-- Коровка нарисована фигурами: эмодзи в WPF выходит чёрно-белым. -->
             <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5">
                 <Canvas.RenderTransform>
@@ -228,5 +228,14 @@
                        HorizontalAlignment="Center"/>
 
         </StackPanel>
+
+        <Canvas x:Name="Bugs" ClipToBounds="True" Grid.ColumnSpan="3" IsHitTestVisible="False">
+            <!-- Домик, куда коровка изредка забирается отсидеться. -->
+            <Canvas x:Name="BugHome" Width="58" Height="50" Opacity="0.9">
+                <Path Data="M3,24 L29,4 L55,24 Z" Fill="#8C4A2F"/>
+                <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="26" Fill="#B9794E"/>
+                <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="3" Fill="#7A4027"/>
+                <Path Data="M19,49 L19,34 A10,10 0 0 1 39,34 L39,49 Z" Fill="#2A1A12"/>
+            </Canvas>
     </Grid>
 </Window>
