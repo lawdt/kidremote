@@ -793,8 +793,7 @@ internal sealed partial class BotService : IDisposable
                     continue;
                 }
 
-                var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message.Text)}\n\n" +
-                           "<i>Просто напишите ответ — он появится у него на экране.</i>";
+                var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message.Text)}";
 
                 var delivered = false;
 
