@@ -23,7 +23,7 @@ internal sealed class ChatWindow : Window
     private readonly StackPanel _history;
     private readonly ScrollViewer _scroll;
     private readonly WrapPanel _emojis;
-    private readonly TextBox _input;
+    private readonly RichTextBox _input;
     private readonly TextBlock _notice;
 
     /// <param name="send">Отправляет реплику и возвращает текст отказа либо null при успехе.</param>
@@ -79,19 +79,19 @@ internal sealed class ChatWindow : Window
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        _input = new TextBox
+        _input = new RichTextBox
         {
             MinHeight = 44,
             MaxHeight = 120,
-            MaxLength = MaxLength,
             FontFamily = Mono,
             FontSize = 14,
             AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            VerticalContentAlignment = VerticalAlignment.Center,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Padding = new Thickness(8, 6, 8, 6)
         };
+
+        _input.Document.PagePadding = new Thickness(0);
+        ResetInput();
 
         // Поле само обрабатывает Enter, поэтому перехватываем его раньше.
         _input.PreviewKeyDown += OnInputKeyDown;
@@ -116,8 +116,8 @@ internal sealed class ChatWindow : Window
 
         var sendButton = new Button
         {
-            Content = "Отправить",
-            Width = 110,
+            Content = EmojiContent("✈️", 20),
+            Width = 56,
             MinHeight = 44,
             Margin = new Thickness(8, 0, 0, 0),
             IsDefault = true
@@ -195,16 +195,37 @@ internal sealed class ChatWindow : Window
             };
 
             var value = emoji;
-            button.Click += (_, _) =>
-            {
-                var position = Math.Clamp(_input.CaretIndex, 0, _input.Text.Length);
-                _input.Text = _input.Text.Insert(position, value);
-                _input.CaretIndex = position + value.Length;
-                _input.Focus();
-            };
+            button.Click += (_, _) => InsertEmoji(value);
 
             _emojis.Children.Add(button);
         }
+    }
+
+    /// <summary>Добавляет смайлик картинкой в конец набранного текста.</summary>
+    private void InsertEmoji(string emoji)
+    {
+        var paragraph = _input.Document.Blocks.LastBlock as Paragraph;
+
+        if (paragraph is null)
+        {
+            paragraph = new Paragraph { Margin = new Thickness(0) };
+            _input.Document.Blocks.Add(paragraph);
+        }
+
+        var inline = EmojiRenderer.Inline(emoji, _input.FontSize);
+
+        if (inline is null) paragraph.Inlines.Add(new Run(emoji));
+        else paragraph.Inlines.Add(inline);
+
+        _input.CaretPosition = _input.Document.ContentEnd;
+        _input.Focus();
+    }
+
+    private void ResetInput()
+    {
+        _input.Document.Blocks.Clear();
+        _input.Document.Blocks.Add(new Paragraph { Margin = new Thickness(0) });
+        _input.CaretPosition = _input.Document.ContentEnd;
     }
 
     private static object EmojiContent(string emoji, double size)
@@ -228,8 +249,9 @@ internal sealed class ChatWindow : Window
 
     private void Submit()
     {
-        var text = _input.Text.Trim();
+        var text = EmojiRenderer.ReadText(_input.Document).Trim();
         if (text.Length == 0) return;
+        if (text.Length > MaxLength) text = text[..MaxLength];
 
         var error = _send(text);
         if (error is not null)
@@ -238,7 +260,7 @@ internal sealed class ChatWindow : Window
             return;
         }
 
-        _input.Clear();
+        ResetInput();
         _notice.Visibility = Visibility.Collapsed;
     }
 

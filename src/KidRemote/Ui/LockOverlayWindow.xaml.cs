@@ -50,6 +50,12 @@ public partial class LockOverlayWindow : Window
 
         BuildEmojiPanel();
         EmojiButton.Content = EmojiButtonContent("🙂");
+        SendButton.Content = EmojiButtonContent("✈️");
+
+        // Отступы по умолчанию у абзаца делают поле выше, чем нужно.
+        ChatInput.Document.PagePadding = new Thickness(0);
+        ChatInput.Document.Blocks.Clear();
+        ChatInput.Document.Blocks.Add(new Paragraph { Margin = new Thickness(0) });
     }
 
     /// <summary>Жук ползёт к случайной точке, иногда замирает и выбирает новую.</summary>
@@ -373,14 +379,37 @@ public partial class LockOverlayWindow : Window
         if (EmojiPanel.Visibility == Visibility.Visible) ChatInput.Focus();
     }
 
-    /// <summary>Вставляет смайлик туда, где стоит курсор, и возвращает фокус в поле.</summary>
+    /// <summary>Добавляет смайлик картинкой в конец набранного текста.</summary>
     private void InsertEmoji(string emoji)
     {
-        var position = Math.Clamp(ChatInput.CaretIndex, 0, ChatInput.Text.Length);
+        var paragraph = InputParagraph();
+        var inline = EmojiRenderer.Inline(emoji, ChatInput.FontSize);
 
-        ChatInput.Text = ChatInput.Text.Insert(position, emoji);
-        ChatInput.CaretIndex = position + emoji.Length;
+        if (inline is null) paragraph.Inlines.Add(new Run(emoji));
+        else paragraph.Inlines.Add(inline);
+
+        ChatInput.CaretPosition = ChatInput.Document.ContentEnd;
         ChatInput.Focus();
+    }
+
+    private Paragraph InputParagraph()
+    {
+        if (ChatInput.Document.Blocks.LastBlock is Paragraph last) return last;
+
+        var paragraph = new Paragraph();
+        ChatInput.Document.Blocks.Add(paragraph);
+        return paragraph;
+    }
+
+    private void OnSendClick(object sender, RoutedEventArgs e) => SubmitInput();
+
+    private void SubmitInput()
+    {
+        var text = EmojiRenderer.ReadText(ChatInput.Document).Trim();
+        if (text.Length == 0) return;
+
+        Core.Log.Write("экран блокировки: отправлена реплика");
+        MessageSubmitted?.Invoke(text);
     }
 
     private void OnChatInputKeyDown(object sender, KeyEventArgs e)
@@ -389,12 +418,8 @@ public partial class LockOverlayWindow : Window
 
         e.Handled = true;
 
-        var text = ChatInput.Text.Trim();
-        if (text.Length == 0) return;
-
         // Поле очищается только после успешной отправки: при отказе текст не пропадёт.
-        Core.Log.Write("экран блокировки: отправлена реплика");
-        MessageSubmitted?.Invoke(text);
+        SubmitInput();
     }
 
     /// <summary>Писать можно только с основного монитора, на остальных поле лишнее.</summary>
@@ -409,7 +434,9 @@ public partial class LockOverlayWindow : Window
 
     internal void ClearChatInput()
     {
-        ChatInput.Clear();
+        ChatInput.Document.Blocks.Clear();
+        ChatInput.Document.Blocks.Add(new Paragraph());
+        ChatInput.CaretPosition = ChatInput.Document.ContentEnd;
         ResetHint();
     }
 

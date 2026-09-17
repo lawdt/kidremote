@@ -98,6 +98,51 @@ internal static class EmojiRenderer
         }
     }
 
+    /// <summary>Картинка-смайлик для вставки в текст: исходный символ хранится в Tag.</summary>
+    public static System.Windows.Documents.InlineUIContainer? Inline(string emoji, double size)
+    {
+        var source = Render(emoji, (int)Math.Round(size * 1.25));
+        if (source is null) return null;
+
+        var image = new System.Windows.Controls.Image
+        {
+            Source = source,
+            Width = size,
+            Height = size,
+            Margin = new System.Windows.Thickness(1, 0, 1, -2)
+        };
+
+        return new System.Windows.Documents.InlineUIContainer(image) { Tag = emoji };
+    }
+
+    /// <summary>Собирает обратно обычную строку: картинки превращаются в свои символы.</summary>
+    public static string ReadText(System.Windows.Documents.FlowDocument document)
+    {
+        var builder = new System.Text.StringBuilder();
+
+        foreach (var block in document.Blocks)
+        {
+            if (block is not System.Windows.Documents.Paragraph paragraph) continue;
+
+            if (builder.Length > 0) builder.Append('\n');
+
+            foreach (var inline in paragraph.Inlines)
+            {
+                switch (inline)
+                {
+                    case System.Windows.Documents.Run run:
+                        builder.Append(run.Text);
+                        break;
+                    case System.Windows.Documents.InlineUIContainer container when container.Tag is string emoji:
+                        builder.Append(emoji);
+                        break;
+                }
+            }
+        }
+
+        return builder.ToString();
+    }
+
     /// <summary>Разбивает текст на обычные куски и эмодзи, сохраняя порядок.</summary>
     public static IEnumerable<(string Text, bool IsEmoji)> Split(string text)
     {

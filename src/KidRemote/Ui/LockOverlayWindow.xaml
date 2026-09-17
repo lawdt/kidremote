@@ -86,18 +86,35 @@
                        Margin="0,8,0,0"
                        Visibility="Collapsed"/>
 
-            <TextBox x:Name="ChatInput"
-                     FontFamily="Consolas, Courier New"
-                     FontSize="15"
-                     Margin="0,8,0,0"
-                     Padding="10,8"
-                     MaxLength="400"
-                     Background="#0E1424"
-                     Foreground="#F5F7FF"
-                     CaretBrush="#00E676"
-                     BorderBrush="#2E3C66"
-                     BorderThickness="1"
-                     PreviewKeyDown="OnChatInputKeyDown"/>
+            <DockPanel Margin="0,8,0,0">
+                <Button x:Name="SendButton"
+                        DockPanel.Dock="Right"
+                        Width="52"
+                        Height="40"
+                        Margin="8,0,0,0"
+                        Background="#1B2440"
+                        Foreground="#F5F7FF"
+                        BorderBrush="#2E3C66"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        Focusable="False"
+                        Click="OnSendClick"/>
+
+                <RichTextBox x:Name="ChatInput"
+                             FontFamily="Consolas, Courier New"
+                             FontSize="15"
+                             MinHeight="40"
+                             MaxHeight="120"
+                             Padding="8,7"
+                             Background="#0E1424"
+                             Foreground="#F5F7FF"
+                             CaretBrush="#00E676"
+                             BorderBrush="#2E3C66"
+                             BorderThickness="1"
+                             VerticalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             PreviewKeyDown="OnChatInputKeyDown"/>
+            </DockPanel>
 
             <DockPanel Margin="2,6,0,0">
                 <Button x:Name="EmojiButton"
