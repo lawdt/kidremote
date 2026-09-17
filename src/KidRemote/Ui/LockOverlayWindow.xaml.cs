@@ -1,7 +1,9 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using KidRemote.Interop;
@@ -12,7 +14,10 @@ namespace KidRemote.Ui;
 public partial class LockOverlayWindow : Window
 {
     private const double BugSpeed = 70;          // пикселей в секунду
+    private const double BugFleeSpeed = 260;     // когда убегает от курсора
     private const double BugTurnRate = 220;      // градусов в секунду
+    private const double BugFleeRadius = 150;    // на таком расстоянии курсор уже пугает
+    private const double BugFleeDistance = 340;  // насколько далеко отбегает
 
     private readonly DispatcherTimer _bugTimer;
     private readonly Random _random = new();
@@ -61,6 +66,8 @@ public partial class LockOverlayWindow : Window
             PickTarget(width, height);
         }
 
+        var fleeing = Flee(x, y, width, height);
+
         var dx = _bugTarget.X - x;
         var dy = _bugTarget.Y - y;
         var distance = Math.Sqrt(dx * dx + dy * dy);
@@ -69,7 +76,7 @@ public partial class LockOverlayWindow : Window
         {
             PickTarget(width, height);
             // Жук иногда замирает — так он выглядит живым, а не заводным.
-            if (_random.NextDouble() < 0.4) _bugPauseLeft = 0.5 + _random.NextDouble() * 2.5;
+            if (!fleeing && _random.NextDouble() < 0.4) _bugPauseLeft = 0.5 + _random.NextDouble() * 2.5;
             return;
         }
 
@@ -78,9 +85,50 @@ public partial class LockOverlayWindow : Window
         _bugAngle = TurnTowards(_bugAngle, desired, BugTurnRate * step);
         BugRotation.Angle = _bugAngle;
 
-        var move = BugSpeed * step;
+        var move = (fleeing ? BugFleeSpeed : BugSpeed) * step;
         Canvas.SetLeft(Bug, x + dx / distance * move);
         Canvas.SetTop(Bug, y + dy / distance * move);
+    }
+
+    /// <summary>
+    /// Коровка боится курсора: когда тот подбирается близко, она разворачивается
+    /// и удирает в противоположную сторону.
+    /// </summary>
+    private bool Flee(double x, double y, double width, double height)
+    {
+        Point cursor;
+
+        try
+        {
+            var screen = Forms.Cursor.Position;
+            cursor = PointFromScreen(new Point(screen.X, screen.Y));
+        }
+        catch
+        {
+            return false;
+        }
+
+        var dx = x - cursor.X;
+        var dy = y - cursor.Y;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+        if (distance > BugFleeRadius) return false;
+
+        // Курсор ровно на коровке — направление выбираем случайно.
+        if (distance < 1)
+        {
+            var angle = _random.NextDouble() * Math.PI * 2;
+            dx = Math.Cos(angle);
+            dy = Math.Sin(angle);
+            distance = 1;
+        }
+
+        const double margin = 30;
+        _bugPauseLeft = 0;
+        _bugTarget = new Point(
+            Math.Clamp(x + dx / distance * BugFleeDistance, margin, Math.Max(margin, width - margin)),
+            Math.Clamp(y + dy / distance * BugFleeDistance, margin, Math.Max(margin, height - margin)));
+
+        return true;
     }
 
     private void PickTarget(double width, double height)
@@ -148,22 +196,21 @@ public partial class LockOverlayWindow : Window
         HealthNote.Visibility = lateHours ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    /// <summary>Последние реплики переписки в углу экрана.</summary>
+    /// <summary>
+    /// Переписка в духе старых чатов: моноширинные строки вида [время] &lt;ник&gt; текст.
+    /// Так она читается одним взглядом и не занимает половину экрана пузырями.
+    /// </summary>
     internal void ShowChat(IReadOnlyList<Core.ChatMessage> messages)
     {
+        ChatLines.Children.Clear();
+
         if (messages.Count == 0)
         {
             ChatPanel.Visibility = Visibility.Collapsed;
             return;
         }
 
-        ChatList.ItemsSource = messages
-            .Select(message => new
-            {
-                Header = $"{message.Author} · {message.Time:HH:mm}",
-                message.Text
-            })
-            .ToList();
+        foreach (var message in messages) ChatLines.Children.Add(ChatLine(message));
 
         ChatPanel.Visibility = Visibility.Visible;
 
@@ -175,6 +222,37 @@ public partial class LockOverlayWindow : Window
             Duration = TimeSpan.FromMilliseconds(500),
             FillBehavior = FillBehavior.Stop
         });
+    }
+
+    private static TextBlock ChatLine(Core.ChatMessage message)
+    {
+        var line = new TextBlock
+        {
+            FontFamily = new FontFamily("Consolas, Courier New"),
+            FontSize = 15,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 3)
+        };
+
+        line.Inlines.Add(new Run($"[{message.Time:HH:mm}] ")
+        {
+            Foreground = new SolidColorBrush(Color.FromRgb(0x4E, 0x5B, 0x7E))
+        });
+
+        line.Inlines.Add(new Run($"<{message.Author}> ")
+        {
+            Foreground = new SolidColorBrush(message.FromParent
+                ? Color.FromRgb(0x7F, 0xC5, 0xFF)
+                : Color.FromRgb(0x00, 0xE6, 0x76)),
+            FontWeight = FontWeights.Bold
+        });
+
+        line.Inlines.Add(new Run(message.Text)
+        {
+            Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7))
+        });
+
+        return line;
     }
 
     /// <summary>Расписание на завтра в углу экрана.</summary>

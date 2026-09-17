@@ -13,7 +13,7 @@
     <Grid>
         <Canvas x:Name="Bugs" ClipToBounds="True">
             <TextBlock x:Name="Bug"
-                       Text="🪲"
+                       Text="🐞"
                        FontFamily="Segoe UI Emoji"
                        FontSize="30"
                        Opacity="0.85"
@@ -26,8 +26,8 @@
 
         <StackPanel x:Name="SchedulePanel"
                     HorizontalAlignment="Left"
-                    VerticalAlignment="Bottom"
-                    Margin="56,0,0,56"
+                    VerticalAlignment="Center"
+                    Margin="56,0,0,0"
                     Visibility="Collapsed">
             <TextBlock x:Name="ScheduleTitle"
                        Text=""
@@ -51,9 +51,9 @@
 
         <StackPanel x:Name="ChatPanel"
                     HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom"
-                    MaxWidth="420"
-                    Margin="0,0,56,56"
+                    VerticalAlignment="Center"
+                    MaxWidth="470"
+                    Margin="0,0,56,0"
                     Visibility="Collapsed">
             <TextBlock Text="Чат с родителями"
                        FontFamily="Segoe UI"
@@ -61,29 +61,13 @@
                        FontWeight="SemiBold"
                        Foreground="#7E8DB5"
                        Margin="0,0,0,10"/>
-            <ItemsControl x:Name="ChatList">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="#161E33"
-                                CornerRadius="10"
-                                Padding="12,8"
-                                Margin="0,0,0,6">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Header}"
-                                           FontFamily="Segoe UI"
-                                           FontSize="12"
-                                           Foreground="#7FC5FF"
-                                           Margin="0,0,0,2"/>
-                                <TextBlock Text="{Binding Text}"
-                                           FontFamily="Segoe UI"
-                                           FontSize="15"
-                                           Foreground="#DCE4F7"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Border Background="#070B14"
+                    BorderBrush="#1E2740"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="14,10">
+                <StackPanel x:Name="ChatLines"/>
+            </Border>
         </StackPanel>
 
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">

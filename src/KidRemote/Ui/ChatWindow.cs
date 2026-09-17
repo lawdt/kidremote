@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using KidRemote.Core;
 
@@ -9,6 +10,8 @@ namespace KidRemote.Ui;
 internal sealed class ChatWindow : Window
 {
     private const int MaxLength = 400;
+
+    private static readonly FontFamily Mono = new("Consolas, Courier New");
 
     private readonly ChatLog _chat;
     private readonly StackPanel _history;
@@ -51,7 +54,7 @@ internal sealed class ChatWindow : Window
         {
             Content = _history,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Background = new SolidColorBrush(Color.FromRgb(0x0B, 0x10, 0x20)),
+            Background = new SolidColorBrush(Color.FromRgb(0x07, 0x0B, 0x14)),
             Padding = new Thickness(12)
         };
 
@@ -64,7 +67,8 @@ internal sealed class ChatWindow : Window
         {
             MinHeight = 70,
             MaxLength = MaxLength,
-            FontSize = 15,
+            FontFamily = Mono,
+            FontSize = 14,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -111,12 +115,14 @@ internal sealed class ChatWindow : Window
     {
         _history.Children.Clear();
 
-        var messages = _chat.Tail(40);
+        var messages = _chat.Tail(60);
         if (messages.Count == 0)
         {
             _history.Children.Add(new TextBlock
             {
-                Text = "Здесь пока пусто. Напишите родителям — сообщение придёт им в Telegram.",
+                Text = "* чат пуст — напишите родителям, сообщение придёт им в Telegram",
+                FontFamily = Mono,
+                FontSize = 14,
                 Foreground = new SolidColorBrush(Color.FromRgb(0x6B, 0x7A, 0xA0)),
                 TextWrapping = TextWrapping.Wrap
             });
@@ -124,44 +130,38 @@ internal sealed class ChatWindow : Window
             return;
         }
 
-        foreach (var message in messages) _history.Children.Add(Bubble(message));
+        foreach (var message in messages) _history.Children.Add(Line(message));
     }
 
-    private static Border Bubble(ChatMessage message)
+    /// <summary>Строка вида [время] &lt;ник&gt; текст — как в старых чатах.</summary>
+    private static TextBlock Line(ChatMessage message)
     {
-        var fromParent = message.FromParent;
-
-        var author = new TextBlock
+        var line = new TextBlock
         {
-            Text = $"{message.Author} · {message.Time:HH:mm}",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(fromParent
-                ? Color.FromRgb(0x7F, 0xC5, 0xFF)
-                : Color.FromRgb(0x8F, 0xA0, 0xC8)),
+            FontFamily = Mono,
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 3)
         };
 
-        var body = new TextBlock
+        line.Inlines.Add(new Run($"[{message.Time:HH:mm}] ")
         {
-            Text = message.Text,
-            FontSize = 15,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0xF7, 0xFF)),
-            TextWrapping = TextWrapping.Wrap
-        };
+            Foreground = new SolidColorBrush(Color.FromRgb(0x4E, 0x5B, 0x7E))
+        });
 
-        var stack = new StackPanel();
-        stack.Children.Add(author);
-        stack.Children.Add(body);
-
-        return new Border
+        line.Inlines.Add(new Run($"<{message.Author}> ")
         {
-            Background = new SolidColorBrush(fromParent
-                ? Color.FromRgb(0x1B, 0x2C, 0x4A)
-                : Color.FromRgb(0x1A, 0x20, 0x33)),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(12, 8, 12, 10),
-            Margin = new Thickness(fromParent ? 0 : 60, 0, fromParent ? 60 : 0, 8),
-            Child = stack
-        };
+            Foreground = new SolidColorBrush(message.FromParent
+                ? Color.FromRgb(0x7F, 0xC5, 0xFF)
+                : Color.FromRgb(0x00, 0xE6, 0x76)),
+            FontWeight = FontWeights.Bold
+        });
+
+        line.Inlines.Add(new Run(message.Text)
+        {
+            Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7))
+        });
+
+        return line;
     }
 }
