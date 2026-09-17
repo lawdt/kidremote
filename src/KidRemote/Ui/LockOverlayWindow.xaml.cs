@@ -236,14 +236,17 @@ public partial class LockOverlayWindow : Window
         ChatPanel.Visibility = Visibility.Visible;
         Dispatcher.BeginInvoke(new Action(() => ChatScroll.ScrollToEnd()), DispatcherPriority.Loaded);
 
-        // Новая реплика проявляется, иначе её легко не заметить на неподвижном экране.
-        ChatPanel.BeginAnimation(OpacityProperty, new DoubleAnimation
+        // Проявляется только свежая строка: анимация всей панели выглядела бы морганием.
+        if (ChatLines.Children.Count > 0 && ChatLines.Children[^1] is UIElement last)
         {
-            From = 0.0,
-            To = 1.0,
-            Duration = TimeSpan.FromMilliseconds(500),
-            FillBehavior = FillBehavior.Stop
-        });
+            last.BeginAnimation(OpacityProperty, new DoubleAnimation
+            {
+                From = 0.0,
+                To = 1.0,
+                Duration = TimeSpan.FromMilliseconds(400),
+                FillBehavior = FillBehavior.Stop
+            });
+        }
     }
 
     private static TextBlock ChatLine(Core.ChatMessage message)
