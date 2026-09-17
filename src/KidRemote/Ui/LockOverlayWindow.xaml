@@ -11,6 +11,19 @@
         WindowStartupLocation="Manual">
 
     <Grid>
+        <Canvas x:Name="Bugs" ClipToBounds="True">
+            <TextBlock x:Name="Bug"
+                       Text="🪲"
+                       FontFamily="Segoe UI Emoji"
+                       FontSize="30"
+                       Opacity="0.85"
+                       RenderTransformOrigin="0.5,0.5">
+                <TextBlock.RenderTransform>
+                    <RotateTransform x:Name="BugRotation" Angle="0"/>
+                </TextBlock.RenderTransform>
+            </TextBlock>
+        </Canvas>
+
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock x:Name="Clock"
                        Text=""
