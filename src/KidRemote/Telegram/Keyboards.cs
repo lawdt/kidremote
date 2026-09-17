@@ -115,8 +115,21 @@ internal static class Keyboards
     }
 
     /// <summary>Переключатели прямо в чате: их видно и меняются одним нажатием.</summary>
-    public static InlineKeyboardMarkup Settings(bool requireFullscreen, bool detectGames, bool alarms, int idleSeconds)
+    public static InlineKeyboardMarkup Settings(TrackingMode tracking, bool alarms, int idleSeconds)
     {
+        var trackingOptions = new (string Caption, TrackingMode Mode)[]
+        {
+            ("Всегда", TrackingMode.Always),
+            ("Полноэкранные", TrackingMode.Fullscreen),
+            ("Все игры", TrackingMode.Games)
+        };
+
+        var trackingRow = trackingOptions
+            .Select(option => InlineKeyboardButton.Create(
+                option.Mode == tracking ? $"• {option.Caption}" : option.Caption,
+                $"track:{option.Mode}"))
+            .ToList();
+
         var idleOptions = new (string Caption, int Seconds)[]
         {
             ("Выкл", 0),
@@ -136,16 +149,7 @@ internal static class Keyboards
         {
             InlineKeyboard = new List<List<InlineKeyboardButton>>
             {
-                new()
-                {
-                    InlineKeyboardButton.Create(
-                        $"{(requireFullscreen ? "☑️" : "⬜️")} Только полноэкранные игры", "toggle:fullscreen")
-                },
-                new()
-                {
-                    InlineKeyboardButton.Create(
-                        $"{(detectGames ? "☑️" : "⬜️")} Засчитывать игры в окне", "toggle:games")
-                },
+                trackingRow,
                 new()
                 {
                     InlineKeyboardButton.Create(

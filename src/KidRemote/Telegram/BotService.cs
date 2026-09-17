@@ -389,18 +389,6 @@ internal sealed partial class BotService : IDisposable
 
                 switch (what)
                 {
-                    case "fullscreen":
-                        _config.RequireFullscreen = !_config.RequireFullscreen;
-                        toast = _config.RequireFullscreen
-                            ? "Только полноэкранные игры"
-                            : "Любое использование компьютера";
-                        break;
-                    case "games":
-                        _config.DetectKnownGames = !_config.DetectKnownGames;
-                        toast = _config.DetectKnownGames
-                            ? "Игры засчитываются и в окне"
-                            : "Только полноэкранный режим";
-                        break;
                     case "alarms":
                         _config.AlarmsEnabled = !_config.AlarmsEnabled;
                         toast = _config.AlarmsEnabled ? "Сигнализация включена" : "Сигнализация выключена";
@@ -442,6 +430,19 @@ internal sealed partial class BotService : IDisposable
                 }
 
                 await ShowAlertsAsync(chatId, messageId, ct).ConfigureAwait(false);
+                return;
+            }
+
+            case "track":
+            {
+                if (parts.Length > 1 && Enum.TryParse<TrackingMode>(parts[1], out var mode))
+                {
+                    _config.Tracking = mode;
+                    _config.Save();
+                }
+
+                await _client.AnswerCallbackAsync(callback.Id, TrackingCaption(_config.Tracking), ct).ConfigureAwait(false);
+                await ShowSettingsAsync(chatId, messageId, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -791,8 +792,7 @@ internal sealed partial class BotService : IDisposable
 
         MarkBusy(chatId, true);
         await EditAsync(chatId, messageId, BuildSettingsText(),
-            Keyboards.Settings(_config.RequireFullscreen, _config.DetectKnownGames, _config.AlarmsEnabled,
-                _config.IdlePauseSeconds),
+            Keyboards.Settings(_config.Tracking, _config.AlarmsEnabled, _config.IdlePauseSeconds),
             ct).ConfigureAwait(false);
     }
 
@@ -801,17 +801,8 @@ internal sealed partial class BotService : IDisposable
         var sb = new StringBuilder();
         sb.AppendLine("<b>Настройки</b>");
         sb.AppendLine();
-        sb.AppendLine(_config.RequireFullscreen
-            ? "Время расходуется только когда открыта игра."
-            : "Время расходуется при любом использовании компьютера.");
-
-        if (_config.RequireFullscreen)
-        {
-            sb.AppendLine(_config.DetectKnownGames
-                ? "Известные игры и всё, запущенное из Steam, засчитываются даже в окне."
-                : "Засчитывается только полноэкранный режим.");
-        }
-
+        sb.AppendLine($"Время идёт: <b>{TrackingCaption(_config.Tracking)}</b>");
+        sb.AppendLine(TrackingHint(_config.Tracking));
         sb.AppendLine();
         sb.AppendLine(_config.AlarmsEnabled
             ? "На последней минуте звучит сигнал и мигает красная рамка."
@@ -885,11 +876,24 @@ internal sealed partial class BotService : IDisposable
         sb.AppendLine();
         sb.AppendLine($"Итог: {snapshot.Explain()}");
         sb.AppendLine();
-        sb.AppendLine($"Только игры: {(_config.RequireFullscreen ? "да" : "нет")}");
-        sb.AppendLine($"Игры в окне: {(_config.DetectKnownGames ? "да" : "нет")}");
+        sb.AppendLine($"Режим: {TrackingCaption(_config.Tracking)}");
 
         return sb.ToString().TrimEnd();
     }
+
+    private static string TrackingCaption(TrackingMode mode) => mode switch
+    {
+        TrackingMode.Always => "всегда",
+        TrackingMode.Fullscreen => "только полноэкранные",
+        _ => "все игры"
+    };
+
+    private static string TrackingHint(TrackingMode mode) => mode switch
+    {
+        TrackingMode.Always => "Считается любое использование компьютера.",
+        TrackingMode.Fullscreen => "Считается только приложение, развёрнутое на весь монитор.",
+        _ => "Считаются полноэкранные приложения и опознанные игры, в том числе оконные. Лаунчеры не в счёт."
+    };
 
     private string BuildParentsText()
     {

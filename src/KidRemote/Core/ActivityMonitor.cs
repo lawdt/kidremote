@@ -67,12 +67,14 @@ internal sealed class ActivityMonitor : IDisposable
         var launcher = GameCatalog.IsLauncher(processName);
 
         // Знакомую игру засчитываем и в окне: играют далеко не всегда на весь экран.
-        var knownGame = !launcher
-                        && _config.DetectKnownGames
-                        && (fromStore || GameCatalog.IsGame(processName, _config.ExtraGames));
+        var knownGame = !launcher && (fromStore || GameCatalog.IsGame(processName, _config.ExtraGames));
 
-        var active = !_config.RequireFullscreen
-                     || (!launcher && (knownGame || IsFullscreen(foreground, out _)));
+        var active = _config.Tracking switch
+        {
+            TrackingMode.Always => true,
+            TrackingMode.Fullscreen => !launcher && IsFullscreen(foreground, out _),
+            _ => !launcher && (knownGame || IsFullscreen(foreground, out _))
+        };
 
         return new ActivitySnapshot(
             SessionActive: _sessionActive,
