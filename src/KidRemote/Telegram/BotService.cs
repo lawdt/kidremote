@@ -223,6 +223,10 @@ internal sealed partial class BotService : IDisposable
                 await RequestAsync(chatId, "quit", 0, ct).ConfigureAwait(false);
                 break;
 
+            case "/debug":
+                await _client.SendMessageAsync(chatId, BuildDebugText(), null, ct).ConfigureAwait(false);
+                break;
+
             case "/help":
                 await _client.SendMessageAsync(chatId, HelpText, null, ct).ConfigureAwait(false);
                 break;
@@ -865,6 +869,28 @@ internal sealed partial class BotService : IDisposable
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>Что именно приложение видит прямо сейчас — для разбора «почему время идёт».</summary>
+    private string BuildDebugText()
+    {
+        var snapshot = _activity();
+        var sb = new StringBuilder();
+
+        sb.AppendLine("<b>Что видит приложение</b>");
+        sb.AppendLine();
+        sb.AppendLine($"Окно: <code>{snapshot.ForegroundProcess ?? "нет"}</code>");
+        sb.AppendLine($"Опознано как игра: {(snapshot.KnownGame ? "да" : "нет")}");
+        sb.AppendLine($"Засчитывается время: {(snapshot.GameActive ? "да" : "нет")}");
+        sb.AppendLine($"Ввод недавно был: {(snapshot.UserActive ? "да" : "нет")}");
+        sb.AppendLine($"Сессия активна: {(snapshot.SessionActive ? "да" : "нет")}");
+        sb.AppendLine();
+        sb.AppendLine($"Итог: {snapshot.Explain()}");
+        sb.AppendLine();
+        sb.AppendLine($"Только игры: {(_config.RequireFullscreen ? "да" : "нет")}");
+        sb.AppendLine($"Игры в окне: {(_config.DetectKnownGames ? "да" : "нет")}");
+
+        return sb.ToString().TrimEnd();
+    }
+
     private string BuildParentsText()
     {
         var sb = new StringBuilder();
@@ -957,6 +983,7 @@ internal sealed partial class BotService : IDisposable
         "/menu — панель с кнопками\n" +
         "/invite — код для второго родителя\n" +
         "/password — пароль на настройки в трее\n" +
+        "/debug — что приложение видит на экране сейчас\n" +
         "/quit — закрыть приложение на компьютере\n\n" +
         "Любое изменение сначала показывает экран подтверждения.";
 

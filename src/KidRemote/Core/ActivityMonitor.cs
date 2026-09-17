@@ -63,11 +63,16 @@ internal sealed class ActivityMonitor : IDisposable
         var foreground = NativeMethods.GetForegroundWindow();
         var (processName, fromStore, pid) = Describe(foreground);
 
+        // Лаунчер сам по себе не игра: развёрнутое окно Steam не должно тратить время.
+        var launcher = GameCatalog.IsLauncher(processName);
+
         // Знакомую игру засчитываем и в окне: играют далеко не всегда на весь экран.
-        var knownGame = _config.DetectKnownGames
+        var knownGame = !launcher
+                        && _config.DetectKnownGames
                         && (fromStore || GameCatalog.IsGame(processName, _config.ExtraGames));
 
-        var active = !_config.RequireFullscreen || knownGame || IsFullscreen(foreground, out _);
+        var active = !_config.RequireFullscreen
+                     || (!launcher && (knownGame || IsFullscreen(foreground, out _)));
 
         return new ActivitySnapshot(
             SessionActive: _sessionActive,

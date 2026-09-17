@@ -35,6 +35,23 @@ internal static class GameCatalog
         "-win64-test"
     };
 
+    /// <summary>
+    /// Магазины, лаунчеры и оболочка системы. Игрой не считаются никогда, даже если окно
+    /// развёрнуто на весь экран: после выхода из игры время должно останавливаться.
+    /// </summary>
+    private static readonly HashSet<string> Launchers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "steam", "steamwebhelper", "steamservice", "gameoverlayui",
+        "epicgameslauncher", "epicwebhelper", "unrealcefsubprocess",
+        "galaxyclient", "galaxyclienthelper", "gog galaxy notifications renderer",
+        "battle.net", "battle.net helper", "agent", "blizzarderror",
+        "origin", "originwebhelperservice", "eadesktop", "eabackgroundservice", "easteamproxy",
+        "upc", "ubisoftconnect", "uplaywebcore",
+        "riotclientux", "riotclientuxrender", "riotclientservices",
+        "explorer", "shellexperiencehost", "searchhost", "startmenuexperiencehost",
+        "applicationframehost", "lockapp", "logonui", "taskmgr"
+    };
+
     private static readonly HashSet<string> Known = new(StringComparer.OrdinalIgnoreCase)
     {
         // песочницы и выживание
@@ -90,6 +107,10 @@ internal static class GameCatalog
         "webbed", "untitled goose game", "peak", "webfishing", "crabgame", "ultimate chicken horse",
         "supermarket simulator", "schedule i", "repo", "buckshot roulette", "content warning"
     };
+
+    /// <summary>Лаунчер или оболочка системы — временем игры не считается.</summary>
+    public static bool IsLauncher(string? processName) =>
+        !string.IsNullOrWhiteSpace(processName) && Launchers.Contains(processName.Trim());
 
     /// <summary>Игра опознана по расположению файла: запущена из папки игрового магазина.</summary>
     public static bool IsGamePath(string? executablePath)
