@@ -166,6 +166,15 @@ public partial class LockOverlayWindow : Window
             .ToList();
 
         ChatPanel.Visibility = Visibility.Visible;
+
+        // Новая реплика проявляется, иначе её легко не заметить на неподвижном экране.
+        ChatPanel.BeginAnimation(OpacityProperty, new DoubleAnimation
+        {
+            From = 0.0,
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(500),
+            FillBehavior = FillBehavior.Stop
+        });
     }
 
     /// <summary>Расписание на завтра в углу экрана.</summary>

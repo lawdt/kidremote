@@ -378,6 +378,10 @@ public partial class App : Application
         {
             _overlay.SetChat(_chat.Tail(4));
 
+            // На закрытом экране реплика уже видна в углу — карточка поверх была бы лишней
+            // и мешала бы удержанию блокировки наверху.
+            if (_overlay.IsVisible) return;
+
             CloseToast();
 
             _toast = new ToastWindow(message.Author, message.Text);
