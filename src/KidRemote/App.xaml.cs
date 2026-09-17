@@ -38,6 +38,8 @@ public partial class App : Application
     private AlertFrameWindow _frame = null!;
     private OverlayManager _overlay = null!;
     private ScheduleService _schedule = null!;
+    private ChatLog _chat = null!;
+    private ToastWindow? _toast;
     private HotkeyListener _hotkey = null!;
 
     private readonly Stopwatch _tickWatch = Stopwatch.StartNew();
@@ -117,7 +119,7 @@ public partial class App : Application
         _hotkey = new HotkeyListener();
         _hotkey.Pressed += OnUnlockHotkey;
 
-        _bot = new BotService(_config, _bank, _store, _state, () => _activity.Capture());
+        _bot = new BotService(_config, _bank, _store, _state, () => _activity.Capture(), _chat);
         _bot.ShutdownRequested += RequestShutdown;
         _bot.Start();
 
@@ -270,6 +272,7 @@ public partial class App : Application
 
         if (blocked)
         {
+            _overlay.SetChat(_chat.Tail(4));
             _overlay.Show();
             if (_countdown.IsVisible) _countdown.Hide();
         }
@@ -334,26 +337,27 @@ public partial class App : Application
         foreach (var pair in survivors) _gamePresence[pair.Key] = pair.Value;
     }
 
-    /// <summary>Сообщение родителям. Пароля не требует — просить о помощи должно быть просто.</summary>
+    /// <summary>Чат с родителями. Пароля не требует — просить о помощи должно быть просто.</summary>
     private void SendMessageToParents()
     {
-        var since = DateTime.UtcNow - _lastChildMessageUtc;
-        if (since < ChildMessageCooldown)
-        {
-            _tray.ShowMessage("KidRemote",
-                $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
-            return;
-        }
-
+        CloseToast();
         _overlay.SuspendGuard();
 
         try
         {
-            var window = new MessageWindow { Owner = _overlay.PrimaryWindow };
+            var window = new ChatWindow(_chat) { Owner = _overlay.PrimaryWindow };
             if (window.ShowDialog() != true) return;
 
             var text = window.Text;
             if (text.Length == 0) return;
+
+            var since = DateTime.UtcNow - _lastChildMessageUtc;
+            if (since < ChildMessageCooldown)
+            {
+                _tray.ShowMessage("KidRemote",
+                    $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
+                return;
+            }
 
             _lastChildMessageUtc = DateTime.UtcNow;
             _ = _bot.SendFromChildAsync(text);
@@ -363,6 +367,29 @@ public partial class App : Application
         {
             _overlay.ResumeGuard();
         }
+    }
+
+    /// <summary>Ответ родителя: показываем карточкой поверх игры и обновляем экран блокировки.</summary>
+    private void OnChatMessage(ChatMessage message)
+    {
+        if (!message.FromParent) return;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            _overlay.SetChat(_chat.Tail(4));
+
+            CloseToast();
+
+            _toast = new ToastWindow(message.Author, message.Text);
+            _toast.Clicked += SendMessageToParents;
+            _toast.Show();
+        });
+    }
+
+    private void CloseToast()
+    {
+        _toast?.CloseQuietly();
+        _toast = null;
     }
 
     private bool ShouldShowCountdown(BankState state, long remaining) => _config.CountdownMode switch
@@ -569,6 +596,7 @@ public partial class App : Application
             // Останавливаемся в любом случае.
         }
 
+        CloseToast();
         _bot?.Dispose();
         _schedule?.Dispose();
         _hotkey?.Dispose();

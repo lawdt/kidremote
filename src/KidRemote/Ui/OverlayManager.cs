@@ -26,6 +26,7 @@ internal sealed class OverlayManager : IDisposable
     private string _phrase = string.Empty;
     private string _scheduleTitle = string.Empty;
     private IReadOnlyList<string> _scheduleLines = Array.Empty<string>();
+    private IReadOnlyList<ChatMessage> _chatMessages = Array.Empty<ChatMessage>();
 
     public OverlayManager(AppConfig config)
     {
@@ -94,6 +95,7 @@ internal sealed class OverlayManager : IDisposable
             window.Render(_phrase);
 
             window.ShowSchedule(_scheduleTitle, _scheduleLines);
+            window.ShowChat(_chatMessages);
 
             if (screen.Primary) window.MessageRequested += () => MessageRequested?.Invoke();
             else window.HideMessageButton();
@@ -136,6 +138,13 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+    }
+
+    public void SetChat(IReadOnlyList<ChatMessage> messages)
+    {
+        _chatMessages = messages;
+
+        foreach (var window in _windows) window.ShowChat(messages);
     }
 
     public void SetSchedule(string title, IReadOnlyList<string> lines)

@@ -39,6 +39,9 @@ internal sealed class Message
 
     [JsonPropertyName("text")]
     public string? Text { get; set; }
+
+    [JsonPropertyName("reply_to_message")]
+    public Message? ReplyToMessage { get; set; }
 }
 
 internal sealed class Chat

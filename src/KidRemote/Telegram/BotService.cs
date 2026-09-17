@@ -29,6 +29,7 @@ internal sealed partial class BotService : IDisposable
     private readonly StateStore _store;
     private readonly PersistedState _state;
     private readonly Func<ActivitySnapshot> _activity;
+    private readonly ChatLog _chat;
     private readonly TelegramClient _client;
     private readonly CancellationTokenSource _cts = new();
     private readonly Dictionary<long, Draft> _drafts = new();
@@ -42,13 +43,15 @@ internal sealed partial class BotService : IDisposable
     private string? _inviteCode;
     private DateTime _inviteExpiresUtc;
 
-    public BotService(AppConfig config, TimeBank bank, StateStore store, PersistedState state, Func<ActivitySnapshot> activity)
+    public BotService(AppConfig config, TimeBank bank, StateStore store, PersistedState state,
+        Func<ActivitySnapshot> activity, ChatLog chat)
     {
         _config = config;
         _bank = bank;
         _store = store;
         _state = state;
         _activity = activity;
+        _chat = chat;
         _client = new TelegramClient(config.ResolvedToken);
     }
 
@@ -149,6 +152,19 @@ internal sealed partial class BotService : IDisposable
             return;
         }
 
+        // Ответ на сообщение бота — это реплика в чат с ребёнком, а не команда.
+        if (message.ReplyToMessage is not null && !text.StartsWith('/'))
+        {
+            await SendToChildAsync(chatId, message.From, text, ct).ConfigureAwait(false);
+            return;
+        }
+
+        if (text.StartsWith("/say ", StringComparison.OrdinalIgnoreCase))
+        {
+            await SendToChildAsync(chatId, message.From, text[5..].Trim(), ct).ConfigureAwait(false);
+            return;
+        }
+
         if (text == Keyboards.MenuButtonText)
         {
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
@@ -221,6 +237,12 @@ internal sealed partial class BotService : IDisposable
 
             case "/quit":
                 await RequestAsync(chatId, "quit", 0, ct).ConfigureAwait(false);
+                break;
+
+            case "/say":
+                await _client.SendMessageAsync(chatId,
+                    "Напишите так: <code>/say текст</code>\n\nИли просто ответьте на сообщение бота — текст уйдёт на экран.",
+                    null, ct).ConfigureAwait(false);
                 break;
 
             case "/debug":
@@ -721,6 +743,20 @@ internal sealed partial class BotService : IDisposable
         }
     }
 
+    /// <summary>Реплика родителя: показывается на компьютере и дублируется второму родителю.</summary>
+    private async Task SendToChildAsync(long chatId, User? from, string text, CancellationToken ct)
+    {
+        if (text.Length == 0) return;
+
+        var author = from?.FirstName;
+        if (string.IsNullOrWhiteSpace(author)) author = "Родитель";
+
+        _chat.Add(author, text, fromParent: true);
+
+        await _client.SendMessageAsync(chatId, "✅ Показано на экране.", null, ct).ConfigureAwait(false);
+        await BroadcastAsync($"💬 <b>{Escape(author)}</b> ребёнку:\n{Escape(text)}", chatId, ct).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Сообщение от ребёнка. Уходит всем родителям независимо от настроек уведомлений:
     /// это не системное событие, а живая просьба.
@@ -730,7 +766,10 @@ internal sealed partial class BotService : IDisposable
         var ct = _cts.Token;
         if (ct.IsCancellationRequested) return;
 
-        var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message)}";
+        _chat.Add("Ребёнок", message, fromParent: false);
+
+        var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message)}\n\n" +
+                   "<i>Ответьте на это сообщение — текст появится у него на экране.</i>";
 
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
@@ -760,7 +799,6 @@ internal sealed partial class BotService : IDisposable
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
             if (chatId == exceptChatId) continue;
-            if (!_config.GetAlerts(chatId).IsEnabled(AlertKind.System)) continue;
             await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
         }
     }
@@ -1008,6 +1046,7 @@ internal sealed partial class BotService : IDisposable
         "/menu — панель с кнопками\n" +
         "/invite — код для второго родителя\n" +
         "/password — пароль на настройки в трее\n" +
+        "/say — написать ребёнку на экран\n" +
         "/debug — что приложение видит на экране сейчас\n" +
         "/quit — закрыть приложение на компьютере\n\n" +
         "Любое изменение сначала показывает экран подтверждения.";

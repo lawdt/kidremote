@@ -148,6 +148,26 @@ public partial class LockOverlayWindow : Window
         HealthNote.Visibility = lateHours ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>Последние реплики переписки в углу экрана.</summary>
+    internal void ShowChat(IReadOnlyList<Core.ChatMessage> messages)
+    {
+        if (messages.Count == 0)
+        {
+            ChatPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ChatList.ItemsSource = messages
+            .Select(message => new
+            {
+                Header = $"{message.Author} · {message.Time:HH:mm}",
+                message.Text
+            })
+            .ToList();
+
+        ChatPanel.Visibility = Visibility.Visible;
+    }
+
     /// <summary>Расписание на завтра в углу экрана.</summary>
     internal void ShowSchedule(string title, IReadOnlyList<string> lines)
     {
