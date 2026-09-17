@@ -20,7 +20,10 @@ public partial class LockOverlayWindow : Window
     private const double BugFleeRadius = 150;    // на таком расстоянии курсор уже пугает
     private const double BugFleeDistance = 340;  // насколько далеко отбегает
 
+    private const string DefaultHint = "напишите родителям и нажмите Enter";
+
     private readonly DispatcherTimer _bugTimer;
+    private readonly DispatcherTimer _hintTimer;
     private readonly Random _random = new();
 
     private Point _bugTarget;
@@ -41,6 +44,9 @@ public partial class LockOverlayWindow : Window
             Interval = TimeSpan.FromMilliseconds(33)
         };
         _bugTimer.Tick += (_, _) => MoveBug();
+
+        _hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _hintTimer.Tick += (_, _) => ResetHint();
     }
 
     /// <summary>Жук ползёт к случайной точке, иногда замирает и выбирает новую.</summary>
@@ -219,6 +225,7 @@ public partial class LockOverlayWindow : Window
         foreach (var message in messages) ChatLines.Children.Add(ChatLine(message));
 
         ChatPanel.Visibility = Visibility.Visible;
+        Dispatcher.BeginInvoke(new Action(() => ChatScroll.ScrollToEnd()), DispatcherPriority.Loaded);
 
         // Новая реплика проявляется, иначе её легко не заметить на неподвижном экране.
         ChatPanel.BeginAnimation(OpacityProperty, new DoubleAnimation
@@ -320,7 +327,7 @@ public partial class LockOverlayWindow : Window
         var text = ChatInput.Text.Trim();
         if (text.Length == 0) return;
 
-        ChatInput.Clear();
+        // Поле очищается только после успешной отправки: при отказе текст не пропадёт.
         Core.Log.Write("экран блокировки: отправлена реплика");
         MessageSubmitted?.Invoke(text);
     }
@@ -331,6 +338,29 @@ public partial class LockOverlayWindow : Window
         ChatInput.Visibility = Visibility.Collapsed;
         ChatHint.Visibility = Visibility.Collapsed;
         LayoutButton.Visibility = Visibility.Collapsed;
+    }
+
+    internal void ClearChatInput()
+    {
+        ChatInput.Clear();
+        ResetHint();
+    }
+
+    /// <summary>Короткое сообщение под полем ввода — например, когда пишут слишком часто.</summary>
+    internal void ShowChatNotice(string notice)
+    {
+        ChatHint.Text = notice;
+        ChatHint.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x81));
+
+        _hintTimer.Stop();
+        _hintTimer.Start();
+    }
+
+    private void ResetHint()
+    {
+        _hintTimer.Stop();
+        ChatHint.Text = DefaultHint;
+        ChatHint.Foreground = new SolidColorBrush(Color.FromRgb(0x5D, 0x6C, 0x94));
     }
 
     internal void FocusChatInput()

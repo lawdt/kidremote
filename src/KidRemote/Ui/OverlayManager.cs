@@ -144,6 +144,17 @@ internal sealed class OverlayManager : IDisposable
         if (_windows.Count > 0) _windows[0].FocusChatInput();
     }
 
+    /// <summary>Сообщение под полем ввода на основном мониторе.</summary>
+    public void ShowChatNotice(string notice)
+    {
+        if (_windows.Count > 0) _windows[0].ShowChatNotice(notice);
+    }
+
+    public void ClearChatInput()
+    {
+        if (_windows.Count > 0) _windows[0].ClearChatInput();
+    }
+
     public void SetChat(IReadOnlyList<ChatMessage> messages)
     {
         _chatMessages = messages;

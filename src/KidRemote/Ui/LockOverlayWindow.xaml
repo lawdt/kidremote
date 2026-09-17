@@ -75,7 +75,11 @@
                     BorderThickness="1"
                     CornerRadius="4"
                     Padding="14,10">
-                <StackPanel x:Name="ChatLines"/>
+                <ScrollViewer x:Name="ChatScroll"
+                              MaxHeight="340"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="ChatLines"/>
+                </ScrollViewer>
             </Border>
 
             <TextBox x:Name="ChatInput"

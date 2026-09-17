@@ -51,7 +51,8 @@ public partial class App : Application
     /// <summary>Сколько игра уже пробыла на переднем плане, по идентификатору процесса.</summary>
     private readonly Dictionary<uint, double> _gamePresence = new();
 
-    private static readonly TimeSpan ChildMessageCooldown = TimeSpan.FromSeconds(60);
+    /// <summary>Не чаще одного сообщения в пять секунд — чтобы чат нельзя было засыпать.</summary>
+    private static readonly TimeSpan ChildMessageCooldown = TimeSpan.FromSeconds(5);
 
     private DateTime _lastChildMessageUtc = DateTime.MinValue;
     private bool _settling;
@@ -308,7 +309,7 @@ public partial class App : Application
 
         if (blocked)
         {
-            _overlay.SetChat(_chat.Tail(6));
+            _overlay.SetChat(_chat.Tail(50));
             _overlay.Show();
             if (_countdown.IsVisible) _countdown.Hide();
         }
@@ -381,14 +382,15 @@ public partial class App : Application
         var since = DateTime.UtcNow - _lastChildMessageUtc;
         if (since < ChildMessageCooldown)
         {
-            _tray.ShowMessage("KidRemote",
-                $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
+            var wait = Math.Max(1, (int)Math.Ceiling((ChildMessageCooldown - since).TotalSeconds));
+            _overlay.ShowChatNotice($"слишком часто — подождите {wait} с");
             return;
         }
 
         _lastChildMessageUtc = DateTime.UtcNow;
         _chat.Add("Ребёнок", text, fromParent: false);
-        _overlay.SetChat(_chat.Tail(6));
+        _overlay.ClearChatInput();
+        _overlay.SetChat(_chat.Tail(50));
         _ = _bot.SendFromChildAsync(text, alreadyLogged: true);
     }
 
@@ -439,7 +441,7 @@ public partial class App : Application
 
         Dispatcher.BeginInvoke(() =>
         {
-            _overlay.SetChat(_chat.Tail(6));
+            _overlay.SetChat(_chat.Tail(50));
 
             // На закрытом экране реплика уже видна в углу — карточка поверх была бы лишней
             // и мешала бы удержанию блокировки наверху.
