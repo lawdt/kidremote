@@ -48,11 +48,16 @@ public partial class App : Application
     /// <summary>Сколько игра уже пробыла на переднем плане, по идентификатору процесса.</summary>
     private readonly Dictionary<uint, double> _gamePresence = new();
 
+    private static readonly TimeSpan ChildMessageCooldown = TimeSpan.FromSeconds(60);
+
+    private DateTime _lastChildMessageUtc = DateTime.MinValue;
+    private bool _settling;
     private DateTime _lastTickUtc = DateTime.UtcNow;
     private DateTime _lastWakeUtc = DateTime.MinValue;
     private long _lastRenderedSeconds = -1;
     private BankState _lastState = BankState.Locked;
     private bool? _lastConsuming;
+    private bool _lastSettling;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -106,6 +111,7 @@ public partial class App : Application
         _tray.OpenConfigRequested += OpenConfig;
         _tray.ExitRequested += ExitByPassword;
         _tray.CountdownModeChanged += OnCountdownModeChanged;
+        _tray.MessageRequested += SendMessageToParents;
 
         _hotkey = new HotkeyListener();
         _hotkey.Pressed += OnUnlockHotkey;
@@ -230,8 +236,13 @@ public partial class App : Application
         if (gap > SleepGapThreshold) HandleWake($"разрыв {gap.TotalSeconds:0} с");
 
         var snapshot = _activity.Capture();
-        if (delta <= MaxTrustedDeltaSeconds && snapshot.ShouldConsume && HasSettledIn(snapshot, delta))
+        var settled = snapshot.ShouldConsume && HasSettledIn(snapshot, delta);
+
+        if (delta <= MaxTrustedDeltaSeconds && settled)
             _bank.Consume(delta);
+
+        // Игра запущена, но фора ещё не вышла — показываем это отдельным цветом.
+        _settling = snapshot.ShouldConsume && !settled;
 
         _countdown.UpdateCursorProximity();
         Render(snapshot);
@@ -244,10 +255,11 @@ public partial class App : Application
         var valueChanged = remaining != _lastRenderedSeconds;
         var stateChanged = state != _lastState;
         // Смена режима расхода меняет цвет плашки, хотя остаток при этом стоит на месте.
-        var consumingChanged = _lastConsuming != snapshot.ShouldConsume;
+        var consumingChanged = _lastConsuming != snapshot.ShouldConsume || _lastSettling != _settling;
 
         if (!force && !valueChanged && !stateChanged && !consumingChanged) return;
         _lastConsuming = snapshot.ShouldConsume;
+        _lastSettling = _settling;
 
         var blocked = state == BankState.Locked;
         var danger = _config.AlarmsEnabled && state == BankState.Running && snapshot.ShouldConsume
@@ -267,7 +279,7 @@ public partial class App : Application
             if (ShouldShowCountdown(state, remaining))
             {
                 if (!_countdown.IsVisible) _countdown.Show();
-                _countdown.Render(state, remaining, snapshot.ShouldConsume, valueChanged);
+                _countdown.Render(state, remaining, snapshot.ShouldConsume, valueChanged, _settling);
             }
             else if (_countdown.IsVisible)
             {
@@ -319,6 +331,37 @@ public partial class App : Application
         _gamePresence.Clear();
 
         foreach (var pair in survivors) _gamePresence[pair.Key] = pair.Value;
+    }
+
+    /// <summary>Сообщение родителям. Пароля не требует — просить о помощи должно быть просто.</summary>
+    private void SendMessageToParents()
+    {
+        var since = DateTime.UtcNow - _lastChildMessageUtc;
+        if (since < ChildMessageCooldown)
+        {
+            _tray.ShowMessage("KidRemote",
+                $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
+            return;
+        }
+
+        _overlay.SuspendGuard();
+
+        try
+        {
+            var window = new MessageWindow();
+            if (window.ShowDialog() != true) return;
+
+            var text = window.Text;
+            if (text.Length == 0) return;
+
+            _lastChildMessageUtc = DateTime.UtcNow;
+            _ = _bot.SendFromChildAsync(text);
+            _tray.ShowMessage("KidRemote", "Сообщение отправлено.");
+        }
+        finally
+        {
+            _overlay.ResumeGuard();
+        }
     }
 
     private bool ShouldShowCountdown(BankState state, long remaining) => _config.CountdownMode switch

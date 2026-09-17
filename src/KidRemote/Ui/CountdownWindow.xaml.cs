@@ -15,6 +15,7 @@ public partial class CountdownWindow : Window
     private static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x17, 0x44));
     private static readonly Brush IdleBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
     private static readonly Brush UnlimitedBrush = new SolidColorBrush(Color.FromRgb(0x40, 0xC4, 0xFF));
+    private static readonly Brush SettlingBrush = new SolidColorBrush(Color.FromRgb(0xB3, 0x88, 0xFF));
 
     private static readonly Brush CalmBackground = new SolidColorBrush(Color.FromArgb(0xB3, 0x00, 0x00, 0x00));
     private static readonly Brush DangerBackground = new SolidColorBrush(Color.FromArgb(0xD9, 0x5A, 0x00, 0x12));
@@ -32,6 +33,7 @@ public partial class CountdownWindow : Window
         DangerBrush.Freeze();
         IdleBrush.Freeze();
         UnlimitedBrush.Freeze();
+        SettlingBrush.Freeze();
         CalmBackground.Freeze();
         DangerBackground.Freeze();
     }
@@ -103,7 +105,7 @@ public partial class CountdownWindow : Window
     }
 
     /// <summary>Рисует остаток. Мигание запускается только когда значение реально изменилось.</summary>
-    internal void Render(BankState state, long remainingSeconds, bool consuming, bool valueChanged)
+    internal void Render(BankState state, long remainingSeconds, bool consuming, bool valueChanged, bool settling)
     {
         if (state == BankState.Unlimited)
         {
@@ -127,6 +129,14 @@ public partial class CountdownWindow : Window
         }
 
         Root.Opacity = 1;
+
+        // Игра только что запущена: отсчёт ещё не начался, и это видно по цвету.
+        if (settling)
+        {
+            TimeText.Foreground = SettlingBrush;
+            Root.Background = CalmBackground;
+            return;
+        }
 
         if (remainingSeconds <= _config.DangerSeconds)
         {

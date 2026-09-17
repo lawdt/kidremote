@@ -8,8 +8,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        WindowStartupLocation="Manual"
-        Cursor="None">
+        WindowStartupLocation="Manual">
 
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -37,6 +36,20 @@
                        Foreground="#8FA0C8"
                        Margin="0,16,0,0"
                        HorizontalAlignment="Center"/>
+
+            <Button x:Name="MessageButton"
+                    Content="✉  Написать родителям"
+                    FontFamily="Segoe UI"
+                    FontSize="16"
+                    Padding="18,10"
+                    Margin="0,48,0,0"
+                    HorizontalAlignment="Center"
+                    Background="#1B2440"
+                    Foreground="#F5F7FF"
+                    BorderBrush="#2E3C66"
+                    BorderThickness="1"
+                    Cursor="Hand"
+                    Click="OnMessageClick"/>
         </StackPanel>
     </Grid>
 </Window>

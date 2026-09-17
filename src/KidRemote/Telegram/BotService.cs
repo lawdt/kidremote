@@ -721,6 +721,27 @@ internal sealed partial class BotService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Сообщение от ребёнка. Уходит всем родителям независимо от настроек уведомлений:
+    /// это не системное событие, а живая просьба.
+    /// </summary>
+    public async Task SendFromChildAsync(string message)
+    {
+        var ct = _cts.Token;
+        if (ct.IsCancellationRequested) return;
+
+        var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message)}";
+
+        foreach (var chatId in _config.ParentChatIds.ToArray())
+        {
+            await _client.SendMessageAsync(chatId, text, Keyboards.QuickAdd(), ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Текст ребёнка попадает в разметку, поэтому угловые скобки экранируем.</summary>
+    private static string Escape(string value) =>
+        value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+
     /// <summary>Рассылает только тем родителям, у кого этот повод не выключен.</summary>
     public async Task NotifyAsync(AlertKind kind, string text)
     {

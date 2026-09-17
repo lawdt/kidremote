@@ -23,6 +23,7 @@ internal sealed class TrayIcon : IDisposable
 
     public event Action? OpenConfigRequested;
     public event Action? ExitRequested;
+    public event Action? MessageRequested;
     public event Action<CountdownMode>? CountdownModeChanged;
 
     public TrayIcon(CountdownMode countdownMode)
@@ -39,6 +40,7 @@ internal sealed class TrayIcon : IDisposable
         menu.Items.Add(_statusItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(countdownMenu);
+        menu.Items.Add("Написать родителям…", null, (_, _) => MessageRequested?.Invoke());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Открыть настройки…", null, (_, _) => OpenConfigRequested?.Invoke());
         menu.Items.Add("Выход…", null, (_, _) => ExitRequested?.Invoke());

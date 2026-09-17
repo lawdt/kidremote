@@ -18,6 +18,9 @@ internal sealed class OverlayManager : IDisposable
     private readonly List<LockOverlayWindow> _windows = new();
     private readonly DispatcherTimer _keepOnTop;
 
+    /// <summary>Ребёнок попросил написать родителям с экрана блокировки.</summary>
+    public event Action? MessageRequested;
+
     private bool _visible;
     private string _phrase = string.Empty;
 
@@ -57,6 +60,10 @@ internal sealed class OverlayManager : IDisposable
             window.Show();
             window.BindToScreen(screen);
             window.Render(_phrase);
+
+            if (screen.Primary) window.MessageRequested += () => MessageRequested?.Invoke();
+            else window.HideMessageButton();
+
             _windows.Add(window);
         }
 

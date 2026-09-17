@@ -11,6 +11,9 @@ public partial class LockOverlayWindow : Window
 {
     private bool _allowClose;
 
+    /// <summary>Ребёнок нажал «Написать родителям».</summary>
+    public event Action? MessageRequested;
+
     public LockOverlayWindow()
     {
         InitializeComponent();
@@ -51,6 +54,11 @@ public partial class LockOverlayWindow : Window
             FillBehavior = FillBehavior.Stop
         });
     }
+
+    private void OnMessageClick(object sender, RoutedEventArgs e) => MessageRequested?.Invoke();
+
+    /// <summary>Кнопка нужна только на основном мониторе, на остальных она лишняя.</summary>
+    internal void HideMessageButton() => MessageButton.Visibility = Visibility.Collapsed;
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
