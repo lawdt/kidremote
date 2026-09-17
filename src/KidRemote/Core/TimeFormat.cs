@@ -12,6 +12,20 @@ internal static class TimeFormat
             : $"{t.Minutes:00}:{t.Seconds:00}";
     }
 
+    /// <summary>
+    /// Метка времени в переписке. У сегодняшних реплик только часы, у вчерашних и старее
+    /// добавляется день — иначе непонятно, когда о чём договаривались.
+    /// </summary>
+    public static string ChatStamp(DateTime moment)
+    {
+        var today = DateTime.Today;
+
+        if (moment.Date == today) return moment.ToString("HH:mm");
+        if (moment.Date == today.AddDays(-1)) return $"вчера {moment:HH:mm}";
+
+        return moment.ToString("dd.MM HH:mm");
+    }
+
     /// <summary>Человеческий формат для сообщений бота: "1 ч 25 мин".</summary>
     public static string Human(long totalSeconds)
     {

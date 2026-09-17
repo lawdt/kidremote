@@ -261,7 +261,7 @@ public partial class LockOverlayWindow : Window
             Margin = new Thickness(0, 0, 0, 3)
         };
 
-        line.Inlines.Add(new Run($"[{message.Time:HH:mm}] ")
+        line.Inlines.Add(new Run($"[{Core.TimeFormat.ChatStamp(message.Time)}] ")
         {
             Foreground = new SolidColorBrush(Color.FromRgb(0x4E, 0x5B, 0x7E))
         });
