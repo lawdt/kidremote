@@ -5,6 +5,11 @@ namespace KidRemote.Interop;
 internal static class NativeMethods
 {
     public const int GWL_EXSTYLE = -20;
+    public const int GWL_STYLE = -16;
+    public const int WS_SYSMENU = 0x00080000;
+
+    public const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
+    public const uint INPUTLANGCHANGE_FORWARD = 0x0002;
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_NOACTIVATE = 0x08000000;
@@ -95,6 +100,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetKeyboardLayout(uint idThread);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);

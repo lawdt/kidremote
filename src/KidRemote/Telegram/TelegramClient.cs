@@ -90,6 +90,19 @@ internal sealed class TelegramClient : IDisposable
         await PostAsync<bool>("answerCallbackQuery", payload, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Отметка эмодзи на сообщении — короче и тише, чем отдельный ответ бота.</summary>
+    public async Task ReactAsync(long chatId, long messageId, string emoji, CancellationToken ct)
+    {
+        var payload = new Dictionary<string, object>
+        {
+            ["chat_id"] = chatId,
+            ["message_id"] = messageId,
+            ["reaction"] = new[] { new Dictionary<string, object> { ["type"] = "emoji", ["emoji"] = emoji } }
+        };
+
+        await PostAsync<bool>("setMessageReaction", payload, ct).ConfigureAwait(false);
+    }
+
     /// <summary>Список команд для стандартной кнопки «Меню» в интерфейсе Telegram.</summary>
     public async Task SetCommandsAsync(IEnumerable<BotCommand> commands, CancellationToken ct)
     {

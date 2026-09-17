@@ -275,6 +275,42 @@ public partial class LockOverlayWindow : Window
         SchedulePanel.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// Переключатель раскладки мышью. Нужен потому, что экран блокировки глушит часть
+    /// системных сочетаний, и привычный способ сменить язык на нём не срабатывает.
+    /// </summary>
+    private void OnLayoutClick(object sender, RoutedEventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+
+        NativeMethods.PostMessage(handle, NativeMethods.WM_INPUTLANGCHANGEREQUEST,
+            new IntPtr(NativeMethods.INPUTLANGCHANGE_FORWARD), IntPtr.Zero);
+
+        // Системе нужно мгновение, чтобы применить раскладку.
+        Dispatcher.BeginInvoke(new Action(RefreshLayoutCaption), DispatcherPriority.Background);
+        ChatInput.Focus();
+    }
+
+    private void RefreshLayoutCaption()
+    {
+        var thread = NativeMethods.GetWindowThreadProcessId(new WindowInteropHelper(this).Handle, out _);
+        var layout = NativeMethods.GetKeyboardLayout(thread);
+
+        // Младшее слово дескриптора раскладки — идентификатор языка.
+        var language = (int)(layout.ToInt64() & 0xFFFF);
+
+        LayoutButton.Content = language switch
+        {
+            0x0419 => "RU",
+            0x0409 => "EN",
+            0x0422 => "UA",
+            0x0423 => "BE",
+            _ => System.Globalization.CultureInfo
+                     .GetCultureInfo(language).TwoLetterISOLanguageName.ToUpperInvariant()
+        };
+    }
+
     private void OnChatInputKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
@@ -294,11 +330,27 @@ public partial class LockOverlayWindow : Window
     {
         ChatInput.Visibility = Visibility.Collapsed;
         ChatHint.Visibility = Visibility.Collapsed;
+        LayoutButton.Visibility = Visibility.Collapsed;
     }
 
     internal void FocusChatInput()
     {
-        if (ChatInput.Visibility == Visibility.Visible) ChatInput.Focus();
+        if (ChatInput.Visibility != Visibility.Visible) return;
+
+        ChatInput.Focus();
+        SafeRefreshLayoutCaption();
+    }
+
+    private void SafeRefreshLayoutCaption()
+    {
+        try
+        {
+            RefreshLayoutCaption();
+        }
+        catch
+        {
+            LayoutButton.Content = "RU";
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -307,6 +359,11 @@ public partial class LockOverlayWindow : Window
         var style = NativeMethods.GetWindowLongAuto(handle, NativeMethods.GWL_EXSTYLE).ToInt64();
         style |= NativeMethods.WS_EX_TOOLWINDOW;
         NativeMethods.SetWindowLongAuto(handle, NativeMethods.GWL_EXSTYLE, new IntPtr(style));
+
+        // Убираем системное меню окна: Alt+Space с пунктами «Переместить» и «Закрыть» здесь лишний.
+        var basic = NativeMethods.GetWindowLongAuto(handle, NativeMethods.GWL_STYLE).ToInt64();
+        basic &= ~(long)NativeMethods.WS_SYSMENU;
+        NativeMethods.SetWindowLongAuto(handle, NativeMethods.GWL_STYLE, new IntPtr(basic));
 
         _bugTimer.Start();
     }

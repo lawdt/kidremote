@@ -155,20 +155,20 @@ internal sealed partial class BotService : IDisposable
         // Ответ на сообщение бота — это реплика в чат с ребёнком, а не команда.
         if (message.ReplyToMessage is not null && !text.StartsWith('/'))
         {
-            await SendToChildAsync(chatId, message.From, text, ct).ConfigureAwait(false);
+            await SendToChildAsync(chatId, message.MessageId, message.From, text, ct).ConfigureAwait(false);
             return;
         }
 
         if (text.StartsWith("/say ", StringComparison.OrdinalIgnoreCase))
         {
-            await SendToChildAsync(chatId, message.From, text[5..].Trim(), ct).ConfigureAwait(false);
+            await SendToChildAsync(chatId, message.MessageId, message.From, text[5..].Trim(), ct).ConfigureAwait(false);
             return;
         }
 
         // Всё, что не команда и не правка баланса, уходит ребёнку на экран как обычное сообщение.
         if (!text.StartsWith('/'))
         {
-            await SendToChildAsync(chatId, message.From, text, ct).ConfigureAwait(false);
+            await SendToChildAsync(chatId, message.MessageId, message.From, text, ct).ConfigureAwait(false);
             return;
         }
 
@@ -751,7 +751,7 @@ internal sealed partial class BotService : IDisposable
     }
 
     /// <summary>Реплика родителя: показывается на компьютере и дублируется второму родителю.</summary>
-    private async Task SendToChildAsync(long chatId, User? from, string text, CancellationToken ct)
+    private async Task SendToChildAsync(long chatId, long messageId, User? from, string text, CancellationToken ct)
     {
         if (text.Length == 0) return;
 
@@ -760,7 +760,8 @@ internal sealed partial class BotService : IDisposable
 
         _chat.Add(author, text, fromParent: true);
 
-        await _client.SendMessageAsync(chatId, "✅ Показано на экране.", null, ct).ConfigureAwait(false);
+        // Вместо отдельного подтверждения помечаем саму реплику: в переписке меньше мусора.
+        await _client.ReactAsync(chatId, messageId, "👀", ct).ConfigureAwait(false);
         await BroadcastAsync($"💬 <b>{Escape(author)}</b> ребёнку:\n{Escape(text)}", chatId, ct).ConfigureAwait(false);
     }
 
