@@ -114,7 +114,11 @@ internal sealed class TelegramClient : IDisposable
 
             if (parsed is { Ok: true }) return parsed.Result;
 
-            Log.Write($"telegram {method}: {(int)response.StatusCode} {parsed?.Description ?? "без описания"}");
+            // Панель перерисовывается по таймеру, и совпадение текста — обычное дело, а не сбой.
+            var description = parsed?.Description ?? "без описания";
+            if (!description.Contains("message is not modified", StringComparison.OrdinalIgnoreCase))
+                Log.Write($"telegram {method}: {(int)response.StatusCode} {description}");
+
             return default;
         }
         catch (OperationCanceledException)
