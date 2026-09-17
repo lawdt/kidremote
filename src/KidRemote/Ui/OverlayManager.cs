@@ -74,6 +74,7 @@ internal sealed class OverlayManager : IDisposable
         if (_visible) return;
 
         _visible = true;
+        Log.Write("экран блокировки показан");
 
         // Новая фраза на каждую блокировку.
         _phrase = Motivation.Next();
@@ -159,6 +160,7 @@ internal sealed class OverlayManager : IDisposable
     {
         if (!_visible) return;
         _visible = false;
+        Log.Write("экран блокировки снят");
 
         _keepOnTop.Stop();
         _clock.Stop();

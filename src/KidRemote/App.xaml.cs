@@ -66,6 +66,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        HookFailureLogging();
+
         // Сторожевой режим: ни окон, ни трея — только присмотр за основным процессом.
         if (e.Args.Any(a => string.Equals(a, Watchdog.GuardArgument, StringComparison.OrdinalIgnoreCase)))
         {
@@ -125,6 +127,8 @@ public partial class App : Application
 
         if (_config.WatchdogEnabled) Watchdog.EnsureGuardRunning();
 
+        Log.Write($"запуск: остаток {_bank.RemainingSeconds} с, безлимит {_bank.IsUnlimited}");
+
         StartTimers();
         ApplyResumeGrant();
         RenderAll(force: true);
@@ -177,6 +181,30 @@ public partial class App : Application
 
         _ = _bot.NotifyAsync(AlertKind.Wake, BuildResumeText("⏰ Компьютер проснулся"));
         _ = _bot.RefreshPanelsAsync(force: true);
+    }
+
+    /// <summary>
+    /// Без этого падение выглядит как «приложение само перезапустилось»: сторож поднимает
+    /// процесс, а причина нигде не остаётся.
+    /// </summary>
+    private void HookFailureLogging()
+    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log.Write($"сбой в интерфейсе: {args.Exception}");
+
+            // Приложение должно пережить единичную ошибку отрисовки, а не уходить в перезапуск.
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            Log.Write($"необработанный сбой: {args.ExceptionObject}");
+
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            Log.Write($"сбой в фоновой задаче: {args.Exception}");
+            args.SetObserved();
+        };
     }
 
     private void StartGuardMode()
@@ -575,6 +603,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (!_guardMode) Log.Write("завершение работы");
+
         if (_guardMode)
         {
             _guardCts?.Cancel();
