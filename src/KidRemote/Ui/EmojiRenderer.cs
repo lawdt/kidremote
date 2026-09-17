@@ -32,6 +32,11 @@ internal static class EmojiRenderer
     {
         try
         {
+            // Селектор варианта рисуется отдельным пустым глифом — рядом со смайликом
+            // появляется «половинка». Для картинки он не нужен.
+            emoji = emoji.Replace("\uFE0F", string.Empty);
+            if (emoji.Length == 0) return null;
+
             using var typeface = PickTypeface(emoji);
             if (typeface is null) return null;
 

@@ -5,6 +5,6 @@ internal static class Emoji
 {
     public static readonly string[] Popular =
     {
-        "👍", "🙏", "😀", "😂", "🥺", "😭", "😡", "❤️", "🎮", "🍕"
+        "👍", "🙏", "😀", "😂", "🥺", "😭", "😡", "💖", "🎮", "🍕"
     };
 }
