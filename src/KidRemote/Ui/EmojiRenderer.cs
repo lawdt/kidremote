@@ -32,26 +32,37 @@ internal static class EmojiRenderer
     {
         try
         {
+            using var typeface = PickTypeface(emoji);
+            if (typeface is null) return null;
+
             using var bitmap = new SKBitmap(size, size, SKColorType.Bgra8888, SKAlphaType.Premul);
             using var canvas = new SKCanvas(bitmap);
             canvas.Clear(SKColors.Transparent);
 
-            using var typeface = SKFontManager.Default.MatchCharacter(
-                                     null, SKFontStyle.Normal, null, char.ConvertToUtf32(emoji, 0))
-                                 ?? SKTypeface.FromFamilyName("Segoe UI Emoji");
-
             using var paint = new SKPaint
             {
                 Typeface = typeface,
-                TextSize = size * 0.86f,
+                TextSize = size,
                 IsAntialias = true,
-                TextAlign = SKTextAlign.Center,
+                TextAlign = SKTextAlign.Left,
                 SubpixelText = true
             };
 
-            var metrics = paint.FontMetrics;
-            var baseline = size / 2f - (metrics.Ascent + metrics.Descent) / 2f;
-            canvas.DrawText(emoji, size / 2f, baseline, paint);
+            // Подбираем размер по реальным границам глифа: у эмодзи они заметно
+            // отличаются от кегля, и при слепом масштабировании картинка обрезается.
+            var bounds = new SKRect();
+            paint.MeasureText(emoji, ref bounds);
+
+            if (bounds.Width <= 0 || bounds.Height <= 0) return null;
+
+            var scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.92f;
+            paint.TextSize = size * scale;
+
+            paint.MeasureText(emoji, ref bounds);
+
+            var x = size / 2f - bounds.MidX;
+            var y = size / 2f - bounds.MidY;
+            canvas.DrawText(emoji, x, y, paint);
 
             using var image = SKImage.FromBitmap(bitmap);
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -69,6 +80,18 @@ internal static class EmojiRenderer
         {
             return null;
         }
+    }
+
+    /// <summary>Сначала пробуем цветной шрифт эмодзи, и только потом — что подберёт система.</summary>
+    private static SKTypeface? PickTypeface(string emoji)
+    {
+        var emojiFont = SKTypeface.FromFamilyName("Segoe UI Emoji");
+        if (emojiFont is not null && emojiFont.CountGlyphs(emoji) > 0) return emojiFont;
+
+        emojiFont?.Dispose();
+
+        return SKFontManager.Default.MatchCharacter(null, SKFontStyle.Normal, null,
+            char.ConvertToUtf32(emoji, 0));
     }
 
     /// <summary>Складывает текст в строку, подменяя эмодзи цветными картинками.</summary>
