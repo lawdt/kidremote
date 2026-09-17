@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -18,6 +19,7 @@ internal sealed class ChatWindow : Window
     private readonly StackPanel _history;
     private readonly ScrollViewer _scroll;
     private readonly TextBox _input;
+    private readonly WrapPanel _emojis;
 
     public string Text => _input.Text.Trim();
 
@@ -64,9 +66,13 @@ internal sealed class ChatWindow : Window
 
         var bottom = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
 
+        _emojis = new WrapPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 8) };
+        bottom.Children.Add(_emojis);
+
         // Поле и кнопка отправки в одну строку: так короткая реплика пишется одним движением.
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         _input = new TextBox
@@ -85,21 +91,45 @@ internal sealed class ChatWindow : Window
 
         _input.KeyDown += OnInputKeyDown;
 
+        var emojiButton = new Button
+        {
+            Content = "🙂",
+            FontFamily = new FontFamily("Segoe UI Emoji"),
+            FontSize = 16,
+            Width = 44,
+            MinHeight = 44,
+            Margin = new Thickness(10, 0, 0, 0),
+            Focusable = false
+        };
+
+        emojiButton.Click += (_, _) =>
+        {
+            _emojis.Visibility = _emojis.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            _input.Focus();
+        };
+
         var send = new Button
         {
             Content = "Отправить",
             Width = 110,
             MinHeight = 44,
-            Margin = new Thickness(10, 0, 0, 0),
+            Margin = new Thickness(8, 0, 0, 0),
             IsDefault = true
         };
 
         send.Click += (_, _) => Submit();
 
         Grid.SetColumn(_input, 0);
-        Grid.SetColumn(send, 1);
+        Grid.SetColumn(emojiButton, 1);
+        Grid.SetColumn(send, 2);
         row.Children.Add(_input);
+        row.Children.Add(emojiButton);
         row.Children.Add(send);
+
+        BuildEmojiPanel();
         bottom.Children.Add(row);
 
         var close = new Button
@@ -125,6 +155,34 @@ internal sealed class ChatWindow : Window
             _input.Focus();
             _scroll.ScrollToEnd();
         };
+    }
+
+    private void BuildEmojiPanel()
+    {
+        foreach (var emoji in Emoji.Popular)
+        {
+            var button = new Button
+            {
+                Content = emoji,
+                FontFamily = new FontFamily("Segoe UI Emoji"),
+                FontSize = 18,
+                Width = 40,
+                Height = 34,
+                Margin = new Thickness(0, 0, 6, 6),
+                Focusable = false
+            };
+
+            var value = emoji;
+            button.Click += (_, _) =>
+            {
+                var position = Math.Clamp(_input.CaretIndex, 0, _input.Text.Length);
+                _input.Text = _input.Text.Insert(position, value);
+                _input.CaretIndex = position + value.Length;
+                _input.Focus();
+            };
+
+            _emojis.Children.Add(button);
+        }
     }
 
     /// <summary>Enter отправляет, Shift+Enter переносит строку.</summary>

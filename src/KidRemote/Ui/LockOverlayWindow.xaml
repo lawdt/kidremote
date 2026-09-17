@@ -82,6 +82,10 @@
                 </ScrollViewer>
             </Border>
 
+            <WrapPanel x:Name="EmojiPanel"
+                       Margin="0,8,0,0"
+                       Visibility="Collapsed"/>
+
             <TextBox x:Name="ChatInput"
                      FontFamily="Consolas, Courier New"
                      FontSize="15"
@@ -96,6 +100,22 @@
                      KeyDown="OnChatInputKeyDown"/>
 
             <DockPanel Margin="2,6,0,0">
+                <Button x:Name="EmojiButton"
+                        DockPanel.Dock="Right"
+                        Content="🙂"
+                        FontFamily="Segoe UI Emoji"
+                        FontSize="14"
+                        Width="42"
+                        Padding="0,4"
+                        Margin="0,0,6,0"
+                        Background="#1B2440"
+                        Foreground="#DCE4F7"
+                        BorderBrush="#2E3C66"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        Focusable="False"
+                        Click="OnEmojiToggle"/>
+
                 <Button x:Name="LayoutButton"
                         DockPanel.Dock="Right"
                         Content="RU"

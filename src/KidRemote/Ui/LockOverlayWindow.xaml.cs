@@ -47,6 +47,8 @@ public partial class LockOverlayWindow : Window
 
         _hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         _hintTimer.Tick += (_, _) => ResetHint();
+
+        BuildEmojiPanel();
     }
 
     /// <summary>Жук ползёт к случайной точке, иногда замирает и выбирает новую.</summary>
@@ -328,6 +330,52 @@ public partial class LockOverlayWindow : Window
         };
     }
 
+    private void BuildEmojiPanel()
+    {
+        foreach (var emoji in Core.Emoji.Popular)
+        {
+            var button = new Button
+            {
+                Content = emoji,
+                FontFamily = new FontFamily("Segoe UI Emoji"),
+                FontSize = 18,
+                Width = 40,
+                Height = 34,
+                Margin = new Thickness(0, 0, 6, 6),
+                Background = new SolidColorBrush(Color.FromRgb(0x14, 0x1C, 0x30)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0xF7, 0xFF)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x3C, 0x66)),
+                BorderThickness = new Thickness(1),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Focusable = false
+            };
+
+            var value = emoji;
+            button.Click += (_, _) => InsertEmoji(value);
+
+            EmojiPanel.Children.Add(button);
+        }
+    }
+
+    private void OnEmojiToggle(object sender, RoutedEventArgs e)
+    {
+        EmojiPanel.Visibility = EmojiPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        if (EmojiPanel.Visibility == Visibility.Visible) ChatInput.Focus();
+    }
+
+    /// <summary>Вставляет смайлик туда, где стоит курсор, и возвращает фокус в поле.</summary>
+    private void InsertEmoji(string emoji)
+    {
+        var position = Math.Clamp(ChatInput.CaretIndex, 0, ChatInput.Text.Length);
+
+        ChatInput.Text = ChatInput.Text.Insert(position, emoji);
+        ChatInput.CaretIndex = position + emoji.Length;
+        ChatInput.Focus();
+    }
+
     private void OnChatInputKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
@@ -348,6 +396,8 @@ public partial class LockOverlayWindow : Window
         ChatInput.Visibility = Visibility.Collapsed;
         ChatHint.Visibility = Visibility.Collapsed;
         LayoutButton.Visibility = Visibility.Collapsed;
+        EmojiButton.Visibility = Visibility.Collapsed;
+        EmojiPanel.Visibility = Visibility.Collapsed;
     }
 
     internal void ClearChatInput()
