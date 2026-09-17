@@ -17,28 +17,6 @@
             <ColumnDefinition x:Name="RightColumn" Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-
-            <!-- Коровка нарисована фигурами: эмодзи в WPF выходит чёрно-белым. -->
-            <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5">
-                <Canvas.RenderTransform>
-                    <RotateTransform x:Name="BugRotation" Angle="0"/>
-                </Canvas.RenderTransform>
-
-                <Ellipse Canvas.Left="9" Canvas.Top="0" Width="12" Height="11" Fill="#15171C"/>
-                <Ellipse Canvas.Left="7" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
-                <Ellipse Canvas.Left="20" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
-
-                <Ellipse Canvas.Left="1" Canvas.Top="7" Width="28" Height="27"
-                         Fill="#D7262F" Stroke="#15171C" StrokeThickness="1.2"/>
-                <Rectangle Canvas.Left="14.3" Canvas.Top="8" Width="1.6" Height="25" Fill="#15171C"/>
-
-                <Ellipse Canvas.Left="5" Canvas.Top="13" Width="5" Height="5" Fill="#15171C"/>
-                <Ellipse Canvas.Left="20" Canvas.Top="13" Width="5" Height="5" Fill="#15171C"/>
-                <Ellipse Canvas.Left="7" Canvas.Top="24" Width="4" Height="4" Fill="#15171C"/>
-                <Ellipse Canvas.Left="19" Canvas.Top="24" Width="4" Height="4" Fill="#15171C"/>
-            </Canvas>
-        </Canvas>
-
         <StackPanel x:Name="SchedulePanel"
                     Grid.Column="0"
                     HorizontalAlignment="Left"
@@ -237,5 +215,26 @@
                 <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="3" Fill="#7A4027"/>
                 <Path Data="M19,49 L19,34 A10,10 0 0 1 39,34 L39,49 Z" Fill="#2A1A12"/>
             </Canvas>
+
+            <!-- Коровка нарисована фигурами: эмодзи в WPF выходит чёрно-белым. -->
+            <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5">
+                <Canvas.RenderTransform>
+                    <RotateTransform x:Name="BugRotation" Angle="0"/>
+                </Canvas.RenderTransform>
+
+                <Ellipse Canvas.Left="9" Canvas.Top="0" Width="12" Height="11" Fill="#15171C"/>
+                <Ellipse Canvas.Left="7" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
+                <Ellipse Canvas.Left="20" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
+
+                <Ellipse Canvas.Left="1" Canvas.Top="7" Width="28" Height="27"
+                         Fill="#D7262F" Stroke="#15171C" StrokeThickness="1.2"/>
+                <Rectangle Canvas.Left="14.3" Canvas.Top="8" Width="1.6" Height="25" Fill="#15171C"/>
+
+                <Ellipse Canvas.Left="5" Canvas.Top="13" Width="5" Height="5" Fill="#15171C"/>
+                <Ellipse Canvas.Left="20" Canvas.Top="13" Width="5" Height="5" Fill="#15171C"/>
+                <Ellipse Canvas.Left="7" Canvas.Top="24" Width="4" Height="4" Fill="#15171C"/>
+                <Ellipse Canvas.Left="19" Canvas.Top="24" Width="4" Height="4" Fill="#15171C"/>
+            </Canvas>
+        </Canvas>
     </Grid>
 </Window>
