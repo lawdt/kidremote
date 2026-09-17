@@ -52,7 +52,7 @@
         <StackPanel x:Name="ChatPanel"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
-                    MaxWidth="470"
+                    Width="640"
                     Margin="0,0,56,0"
                     Visibility="Collapsed">
             <TextBlock Text="Чат с родителями"
@@ -68,6 +68,26 @@
                     Padding="14,10">
                 <StackPanel x:Name="ChatLines"/>
             </Border>
+
+            <TextBox x:Name="ChatInput"
+                     FontFamily="Consolas, Courier New"
+                     FontSize="15"
+                     Margin="0,8,0,0"
+                     Padding="10,8"
+                     MaxLength="400"
+                     Background="#0E1424"
+                     Foreground="#F5F7FF"
+                     CaretBrush="#00E676"
+                     BorderBrush="#2E3C66"
+                     BorderThickness="1"
+                     KeyDown="OnChatInputKeyDown"/>
+
+            <TextBlock x:Name="ChatHint"
+                       Text="напишите родителям и нажмите Enter"
+                       FontFamily="Segoe UI"
+                       FontSize="13"
+                       Foreground="#5D6C94"
+                       Margin="2,6,0,0"/>
         </StackPanel>
 
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -117,19 +137,6 @@
                        Visibility="Collapsed"
                        HorizontalAlignment="Center"/>
 
-            <Button x:Name="MessageButton"
-                    Content="✉  Написать родителям"
-                    FontFamily="Segoe UI"
-                    FontSize="16"
-                    Padding="18,10"
-                    Margin="0,48,0,0"
-                    HorizontalAlignment="Center"
-                    Background="#1B2440"
-                    Foreground="#F5F7FF"
-                    BorderBrush="#2E3C66"
-                    BorderThickness="1"
-                    Cursor="Hand"
-                    Click="OnMessageClick"/>
         </StackPanel>
     </Grid>
 </Window>

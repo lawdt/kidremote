@@ -19,8 +19,8 @@ internal sealed class OverlayManager : IDisposable
     private readonly DispatcherTimer _keepOnTop;
     private readonly DispatcherTimer _clock;
 
-    /// <summary>Ребёнок попросил написать родителям с экрана блокировки.</summary>
-    public event Action? MessageRequested;
+    /// <summary>Ребёнок отправил реплику прямо с экрана блокировки.</summary>
+    public event Action<string>? MessageSubmitted;
 
     private bool _visible;
     private string _phrase = string.Empty;
@@ -95,8 +95,8 @@ internal sealed class OverlayManager : IDisposable
             window.ShowSchedule(_scheduleTitle, _scheduleLines);
             window.ShowChat(_chatMessages);
 
-            if (screen.Primary) window.MessageRequested += () => MessageRequested?.Invoke();
-            else window.HideMessageButton();
+            if (screen.Primary) window.MessageSubmitted += text => MessageSubmitted?.Invoke(text);
+            else window.HideChatInput();
 
             _windows.Add(window);
         }
@@ -107,6 +107,9 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+
+        // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
+        if (_windows.Count > 0) _windows[0].FocusChatInput();
     }
 
     /// <summary>
@@ -136,6 +139,9 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+
+        // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
+        if (_windows.Count > 0) _windows[0].FocusChatInput();
     }
 
     public void SetChat(IReadOnlyList<ChatMessage> messages)

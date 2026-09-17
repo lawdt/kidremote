@@ -165,6 +165,13 @@ internal sealed partial class BotService : IDisposable
             return;
         }
 
+        // Всё, что не команда и не правка баланса, уходит ребёнку на экран как обычное сообщение.
+        if (!text.StartsWith('/'))
+        {
+            await SendToChildAsync(chatId, message.From, text, ct).ConfigureAwait(false);
+            return;
+        }
+
         if (text == Keyboards.MenuButtonText)
         {
             await SendPanelAsync(chatId, ct).ConfigureAwait(false);
@@ -761,19 +768,20 @@ internal sealed partial class BotService : IDisposable
     /// Сообщение от ребёнка. Уходит всем родителям независимо от настроек уведомлений:
     /// это не системное событие, а живая просьба.
     /// </summary>
-    public async Task SendFromChildAsync(string message)
+    public async Task SendFromChildAsync(string message, bool alreadyLogged = false)
     {
         var ct = _cts.Token;
         if (ct.IsCancellationRequested) return;
 
-        _chat.Add("Ребёнок", message, fromParent: false);
+        if (!alreadyLogged) _chat.Add("Ребёнок", message, fromParent: false);
 
         var text = $"✉️ <b>Сообщение от ребёнка</b>\n\n{Escape(message)}\n\n" +
-                   "<i>Ответьте на это сообщение — текст появится у него на экране.</i>";
+                   "<i>Просто напишите ответ — он появится у него на экране.</i>";
 
+        // Без кнопок добавления времени: это разговор, а не повод выдавать минуты.
         foreach (var chatId in _config.ParentChatIds.ToArray())
         {
-            await _client.SendMessageAsync(chatId, text, Keyboards.QuickAdd(), ct).ConfigureAwait(false);
+            await _client.SendMessageAsync(chatId, text, null, ct).ConfigureAwait(false);
         }
     }
 

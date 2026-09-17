@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -27,8 +28,8 @@ public partial class LockOverlayWindow : Window
     private double _bugPauseLeft;
     private bool _allowClose;
 
-    /// <summary>Ребёнок нажал «Написать родителям».</summary>
-    public event Action? MessageRequested;
+    /// <summary>Ребёнок отправил реплику прямо с экрана блокировки.</summary>
+    public event Action<string>? MessageSubmitted;
 
     public LockOverlayWindow()
     {
@@ -206,8 +207,13 @@ public partial class LockOverlayWindow : Window
 
         if (messages.Count == 0)
         {
-            ChatPanel.Visibility = Visibility.Collapsed;
-            return;
+            ChatLines.Children.Add(new TextBlock
+            {
+                Text = "* пока тихо",
+                FontFamily = new FontFamily("Consolas, Courier New"),
+                FontSize = 15,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x4E, 0x5B, 0x7E))
+            });
         }
 
         foreach (var message in messages) ChatLines.Children.Add(ChatLine(message));
@@ -269,14 +275,31 @@ public partial class LockOverlayWindow : Window
         SchedulePanel.Visibility = Visibility.Visible;
     }
 
-    private void OnMessageClick(object sender, RoutedEventArgs e)
+    private void OnChatInputKeyDown(object sender, KeyEventArgs e)
     {
-        Core.Log.Write("экран блокировки: нажата кнопка сообщения");
-        MessageRequested?.Invoke();
+        if (e.Key != Key.Enter) return;
+
+        e.Handled = true;
+
+        var text = ChatInput.Text.Trim();
+        if (text.Length == 0) return;
+
+        ChatInput.Clear();
+        Core.Log.Write("экран блокировки: отправлена реплика");
+        MessageSubmitted?.Invoke(text);
     }
 
-    /// <summary>Кнопка нужна только на основном мониторе, на остальных она лишняя.</summary>
-    internal void HideMessageButton() => MessageButton.Visibility = Visibility.Collapsed;
+    /// <summary>Писать можно только с основного монитора, на остальных поле лишнее.</summary>
+    internal void HideChatInput()
+    {
+        ChatInput.Visibility = Visibility.Collapsed;
+        ChatHint.Visibility = Visibility.Collapsed;
+    }
+
+    internal void FocusChatInput()
+    {
+        if (ChatInput.Visibility == Visibility.Visible) ChatInput.Focus();
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {

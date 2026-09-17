@@ -106,7 +106,7 @@ public partial class App : Application
         _activity = new ActivityMonitor(_config);
         _activity.SystemResumed += OnSystemResumed;
         _overlay = new OverlayManager(_config);
-        _overlay.MessageRequested += SendMessageToParents;
+        _overlay.MessageSubmitted += SendFromLockScreen;
 
         _chat = new ChatLog();
         _chat.Added += OnChatMessage;
@@ -308,7 +308,7 @@ public partial class App : Application
 
         if (blocked)
         {
-            _overlay.SetChat(_chat.Tail(4));
+            _overlay.SetChat(_chat.Tail(6));
             _overlay.Show();
             if (_countdown.IsVisible) _countdown.Hide();
         }
@@ -373,6 +373,25 @@ public partial class App : Application
         foreach (var pair in survivors) _gamePresence[pair.Key] = pair.Value;
     }
 
+    /// <summary>Реплика, отправленная прямо с экрана блокировки.</summary>
+    private void SendFromLockScreen(string text)
+    {
+        if (text.Length == 0) return;
+
+        var since = DateTime.UtcNow - _lastChildMessageUtc;
+        if (since < ChildMessageCooldown)
+        {
+            _tray.ShowMessage("KidRemote",
+                $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
+            return;
+        }
+
+        _lastChildMessageUtc = DateTime.UtcNow;
+        _chat.Add("Ребёнок", text, fromParent: false);
+        _overlay.SetChat(_chat.Tail(6));
+        _ = _bot.SendFromChildAsync(text, alreadyLogged: true);
+    }
+
     /// <summary>Чат с родителями. Пароля не требует — просить о помощи должно быть просто.</summary>
     private void SendMessageToParents()
     {
@@ -420,7 +439,7 @@ public partial class App : Application
 
         Dispatcher.BeginInvoke(() =>
         {
-            _overlay.SetChat(_chat.Tail(4));
+            _overlay.SetChat(_chat.Tail(6));
 
             // На закрытом экране реплика уже видна в углу — карточка поверх была бы лишней
             // и мешала бы удержанию блокировки наверху.
