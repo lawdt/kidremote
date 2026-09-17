@@ -369,11 +369,14 @@ public partial class App : Application
     private void SendMessageToParents()
     {
         CloseToast();
+
+        // Пока открыт чат, экран блокировки не лезет наверх — владелец окну не нужен,
+        // а привязка к окну, которое может закрыться, роняла диалог.
         _overlay.SuspendGuard();
 
         try
         {
-            var window = new ChatWindow(_chat) { Owner = _overlay.PrimaryWindow };
+            var window = new ChatWindow(_chat);
             if (window.ShowDialog() != true) return;
 
             var text = window.Text;
@@ -390,6 +393,11 @@ public partial class App : Application
             _lastChildMessageUtc = DateTime.UtcNow;
             _ = _bot.SendFromChildAsync(text);
             _tray.ShowMessage("KidRemote", "Сообщение отправлено.");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"чат: {ex}");
+            _tray.ShowMessage("KidRemote", "Не удалось открыть чат, подробности в журнале.");
         }
         finally
         {

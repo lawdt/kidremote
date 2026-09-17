@@ -66,9 +66,6 @@ internal sealed class OverlayManager : IDisposable
 
     public bool IsVisible => _visible;
 
-    /// <summary>Окно на основном мониторе — владелец диалогов, открываемых поверх блокировки.</summary>
-    public Window? PrimaryWindow => _windows.Count > 0 ? _windows[0] : null;
-
     public void Show()
     {
         if (_visible) return;
