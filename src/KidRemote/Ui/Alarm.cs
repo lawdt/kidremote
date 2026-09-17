@@ -13,7 +13,7 @@ internal static class Alarm
 
     private static readonly Lazy<SoundPlayer?> Soft = new(() => Build(new[] { 880.0, 1175.0 }, 130, 0.20));
     private static readonly Lazy<SoundPlayer?> Urgent = new(() => Build(new[] { 1568.0, 1568.0 }, 90, 0.28));
-    private static readonly Lazy<SoundPlayer?> Chime = new(() => Build(new[] { 659.3, 987.8 }, 150, 0.18));
+    private static readonly Lazy<SoundPlayer?> Chime = new(() => Build(new[] { 659.3, 987.8 }, 190, 0.32));
 
     /// <summary>Мягкий сигнал на переходе минуты в жёлтой зоне.</summary>
     public static void Minute() => Play(Soft.Value);
@@ -26,15 +26,20 @@ internal static class Alarm
 
     private static void Play(SoundPlayer? player)
     {
-        if (player is null) return;
-
         try
         {
-            player.Play();
+            if (player is not null)
+            {
+                player.Play();
+                return;
+            }
+
+            // Синтезировать не вышло — пусть прозвучит хотя бы системный сигнал.
+            SystemSounds.Asterisk.Play();
         }
-        catch
+        catch (Exception ex)
         {
-            // Нет звукового устройства — молчим, ронять приложение из-за писка незачем.
+            Core.Log.Write($"звук: {ex.GetType().Name} {ex.Message}");
         }
     }
 
@@ -47,8 +52,9 @@ internal static class Alarm
             player.Load();
             return player;
         }
-        catch
+        catch (Exception ex)
         {
+            Core.Log.Write($"звук: не удалось подготовить сигнал, {ex.GetType().Name} {ex.Message}");
             return null;
         }
     }
