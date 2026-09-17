@@ -179,7 +179,15 @@
                        FontSize="64"
                        FontWeight="Light"
                        Foreground="#5D6C94"
-                       Margin="0,0,0,28"
+                       Margin="0,0,0,6"
+                       HorizontalAlignment="Center"/>
+
+            <TextBlock x:Name="DateLine"
+                       Text=""
+                       FontFamily="Segoe UI"
+                       FontSize="20"
+                       Foreground="#46527A"
+                       Margin="0,0,0,26"
                        HorizontalAlignment="Center"/>
 
             <TextBlock x:Name="Glyph"

@@ -22,6 +22,9 @@ public partial class LockOverlayWindow : Window
 
     private const string DefaultHint = "напишите родителям и нажмите Enter";
 
+    /// <summary>Названия дней и месяцев берём русские независимо от настроек системы.</summary>
+    private static readonly System.Globalization.CultureInfo Russian = new("ru-RU");
+
     private readonly DispatcherTimer _bugTimer;
     private readonly DispatcherTimer _hintTimer;
     private readonly Random _random = new();
@@ -207,6 +210,9 @@ public partial class LockOverlayWindow : Window
     internal void UpdateClock(DateTime now, bool lateHours)
     {
         Clock.Text = now.ToString("HH:mm");
+
+        var date = now.ToString("dddd, d MMMM", Russian);
+        DateLine.Text = char.ToUpper(date[0], Russian) + date[1..];
 
         var note = lateHours ? HealthText : string.Empty;
         if (HealthNote.Text != note) HealthNote.Text = note;
@@ -510,6 +516,7 @@ public partial class LockOverlayWindow : Window
         if (screenWidth < 1280)
         {
             Clock.FontSize = 44;
+            DateLine.FontSize = 16;
             Glyph.FontSize = 52;
             Headline.FontSize = 30;
             Headline.MaxWidth = 420;
