@@ -114,7 +114,7 @@ internal sealed class ChatWindow : Window
             _input.Focus();
         };
 
-        var send = new Button
+        var sendButton = new Button
         {
             Content = "Отправить",
             Width = 110,
@@ -123,14 +123,14 @@ internal sealed class ChatWindow : Window
             IsDefault = true
         };
 
-        send.Click += (_, _) => Submit();
+        sendButton.Click += (_, _) => Submit();
 
         Grid.SetColumn(_input, 0);
         Grid.SetColumn(emojiButton, 1);
-        Grid.SetColumn(send, 2);
+        Grid.SetColumn(sendButton, 2);
         row.Children.Add(_input);
         row.Children.Add(emojiButton);
-        row.Children.Add(send);
+        row.Children.Add(sendButton);
         bottom.Children.Add(row);
 
         BuildEmojiPanel();
