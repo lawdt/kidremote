@@ -11,7 +11,13 @@
         WindowStartupLocation="Manual">
 
     <Grid>
-        <Canvas x:Name="Bugs" ClipToBounds="True">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="LeftColumn" Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="RightColumn" Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <Canvas x:Name="Bugs" ClipToBounds="True" Grid.ColumnSpan="3">
             <!-- Коровка нарисована фигурами: эмодзи в WPF выходит чёрно-белым. -->
             <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5">
                 <Canvas.RenderTransform>
@@ -34,9 +40,10 @@
         </Canvas>
 
         <StackPanel x:Name="SchedulePanel"
+                    Grid.Column="0"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Center"
-                    Margin="110,0,0,0"
+                    Margin="56,0,24,0"
                     Visibility="Collapsed">
             <TextBlock x:Name="ScheduleTitle"
                        Text=""
@@ -59,10 +66,11 @@
         </StackPanel>
 
         <StackPanel x:Name="ChatPanel"
+                    Grid.Column="2"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
-                    Width="720"
-                    Margin="0,0,56,0"
+                    Width="620"
+                    Margin="24,0,56,0"
                     Visibility="Collapsed">
             <TextBlock Text="Чат с родителями"
                        FontFamily="Segoe UI"
@@ -161,7 +169,10 @@
             </DockPanel>
         </StackPanel>
 
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+        <StackPanel x:Name="CenterPanel"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
             <TextBlock x:Name="Clock"
                        Text=""
                        FontFamily="Segoe UI"
@@ -183,7 +194,7 @@
                        FontSize="42"
                        FontWeight="SemiBold"
                        Foreground="#F5F7FF"
-                       MaxWidth="900"
+                       MaxWidth="620"
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        HorizontalAlignment="Center"/>
@@ -201,7 +212,7 @@
                        FontFamily="Segoe UI"
                        FontSize="17"
                        Foreground="#C9A227"
-                       MaxWidth="760"
+                       MaxWidth="560"
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        Margin="0,32,0,0"

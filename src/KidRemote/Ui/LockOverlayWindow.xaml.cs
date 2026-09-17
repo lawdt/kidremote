@@ -30,6 +30,7 @@ public partial class LockOverlayWindow : Window
     private double _bugAngle;
     private double _bugPauseLeft;
     private bool _allowClose;
+    private bool _scheduleAllowed = true;
 
     /// <summary>Ребёнок отправил реплику прямо с экрана блокировки.</summary>
     public event Action<string>? MessageSubmitted;
@@ -165,6 +166,8 @@ public partial class LockOverlayWindow : Window
     /// <summary>Растягивает окно ровно по границам конкретного монитора.</summary>
     internal void BindToScreen(Forms.Screen screen)
     {
+        AdjustLayout(screen.Bounds.Width);
+
         var bounds = screen.Bounds;
         var source = PresentationSource.FromVisual(this);
         var scaleX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
@@ -290,7 +293,7 @@ public partial class LockOverlayWindow : Window
     /// <summary>Расписание на завтра в углу экрана.</summary>
     internal void ShowSchedule(string title, IReadOnlyList<string> lines)
     {
-        if (lines.Count == 0 || title.Length == 0)
+        if (!_scheduleAllowed || lines.Count == 0 || title.Length == 0)
         {
             SchedulePanel.Visibility = Visibility.Collapsed;
             return;
@@ -476,6 +479,42 @@ public partial class LockOverlayWindow : Window
         catch
         {
             LayoutButton.Content = "RU";
+        }
+    }
+
+    /// <summary>
+    /// На узком экране боковым панелям не хватает места, и они лезут на фразу по центру.
+    /// Поэтому на небольших разрешениях чат ужимаем, а расписание убираем совсем.
+    /// </summary>
+    private void AdjustLayout(int screenWidth)
+    {
+        if (screenWidth >= 1600)
+        {
+            ChatPanel.Width = 620;
+            _scheduleAllowed = true;
+        }
+        else if (screenWidth >= 1280)
+        {
+            ChatPanel.Width = 460;
+            _scheduleAllowed = true;
+        }
+        else
+        {
+            ChatPanel.Width = 380;
+            _scheduleAllowed = false;
+        }
+
+        if (!_scheduleAllowed) SchedulePanel.Visibility = Visibility.Collapsed;
+
+        // Мелкий экран: крупные надписи по центру занимают всю ширину.
+        if (screenWidth < 1280)
+        {
+            Clock.FontSize = 44;
+            Glyph.FontSize = 52;
+            Headline.FontSize = 30;
+            Headline.MaxWidth = 420;
+            HealthNote.FontSize = 14;
+            HealthNote.MaxWidth = 420;
         }
     }
 
