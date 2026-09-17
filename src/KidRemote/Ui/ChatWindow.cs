@@ -89,7 +89,7 @@ internal sealed class ChatWindow : Window
             Padding = new Thickness(8, 6, 8, 6)
         };
 
-        _input.KeyDown += OnInputKeyDown;
+        _input.PreviewKeyDown += OnInputKeyDown;
 
         var emojiButton = new Button
         {

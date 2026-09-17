@@ -97,7 +97,7 @@
                      CaretBrush="#00E676"
                      BorderBrush="#2E3C66"
                      BorderThickness="1"
-                     KeyDown="OnChatInputKeyDown"/>
+                     PreviewKeyDown="OnChatInputKeyDown"/>
 
             <DockPanel Margin="2,6,0,0">
                 <Button x:Name="EmojiButton"
