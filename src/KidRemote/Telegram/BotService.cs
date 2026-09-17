@@ -704,7 +704,7 @@ internal sealed partial class BotService : IDisposable
         if (!force && text == _lastPanelText) return;
         _lastPanelText = text;
 
-        var markup = Keyboards.Main(_bank.State);
+        var markup = Keyboards.Panel(_bank.State);
 
         foreach (var (chatKey, messageId) in _state.PanelMessages.ToArray())
         {
@@ -807,7 +807,7 @@ internal sealed partial class BotService : IDisposable
     {
         MarkBusy(chatId, false);
         _lastPanelText = BuildStatusText();
-        var messageId = await _client.SendMessageAsync(chatId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+        var messageId = await _client.SendMessageAsync(chatId, _lastPanelText, Keyboards.Panel(_bank.State), ct).ConfigureAwait(false);
         if (messageId is null) return;
 
         RememberPanel(chatId, messageId.Value);
@@ -821,7 +821,7 @@ internal sealed partial class BotService : IDisposable
         MarkBusy(chatId, false);
         RememberPanel(chatId, messageId);
         _lastPanelText = BuildStatusText();
-        await EditAsync(chatId, messageId, _lastPanelText, Keyboards.Main(_bank.State), ct).ConfigureAwait(false);
+        await EditAsync(chatId, messageId, _lastPanelText, Keyboards.Panel(_bank.State), ct).ConfigureAwait(false);
     }
 
     private async Task ShowAlertsAsync(long chatId, long messageId, CancellationToken ct)

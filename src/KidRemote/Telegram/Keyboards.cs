@@ -13,7 +13,7 @@ internal enum DraftMode
 internal static class Keyboards
 {
     /// <summary>Главная панель. Все изменяющие кнопки ведут на экран подтверждения.</summary>
-    public static InlineKeyboardMarkup Main(BankState state)
+    public static InlineKeyboardMarkup Panel(BankState state)
     {
         var rows = new List<List<InlineKeyboardButton>>
         {

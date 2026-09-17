@@ -106,6 +106,14 @@ public partial class App : Application
         _activity = new ActivityMonitor(_config);
         _activity.SystemResumed += OnSystemResumed;
         _overlay = new OverlayManager(_config);
+        _overlay.MessageRequested += SendMessageToParents;
+
+        _chat = new ChatLog();
+        _chat.Added += OnChatMessage;
+
+        _schedule = new ScheduleService(_config);
+        _schedule.Updated += OnScheduleUpdated;
+        _schedule.Start();
 
         _countdown = new CountdownWindow(_config);
         _countdown.Show();
