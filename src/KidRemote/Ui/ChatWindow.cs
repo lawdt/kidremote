@@ -8,7 +8,10 @@ using KidRemote.Core;
 
 namespace KidRemote.Ui;
 
-/// <summary>Переписка с родителями: история сверху, поле ввода снизу.</summary>
+/// <summary>
+/// Переписка с родителями: история сверху, строка ввода снизу. Окно не закрывается
+/// после отправки — разговор обычно длиннее одной реплики.
+/// </summary>
 internal sealed class ChatWindow : Window
 {
     private const int MaxLength = 400;
@@ -16,16 +19,18 @@ internal sealed class ChatWindow : Window
     private static readonly FontFamily Mono = new("Consolas, Courier New");
 
     private readonly ChatLog _chat;
+    private readonly Func<string, string?> _send;
     private readonly StackPanel _history;
     private readonly ScrollViewer _scroll;
-    private readonly TextBox _input;
     private readonly WrapPanel _emojis;
+    private readonly TextBox _input;
+    private readonly TextBlock _notice;
 
-    public string Text => _input.Text.Trim();
-
-    public ChatWindow(ChatLog chat)
+    /// <param name="send">Отправляет реплику и возвращает текст отказа либо null при успехе.</param>
+    public ChatWindow(ChatLog chat, Func<string, string?> send)
     {
         _chat = chat;
+        _send = send;
 
         Title = "KidRemote";
         Width = 640;
@@ -69,7 +74,6 @@ internal sealed class ChatWindow : Window
         _emojis = new WrapPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 8) };
         bottom.Children.Add(_emojis);
 
-        // Поле и кнопка отправки в одну строку: так короткая реплика пишется одним движением.
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -89,13 +93,12 @@ internal sealed class ChatWindow : Window
             Padding = new Thickness(8, 6, 8, 6)
         };
 
+        // Поле само обрабатывает Enter, поэтому перехватываем его раньше.
         _input.PreviewKeyDown += OnInputKeyDown;
 
         var emojiButton = new Button
         {
-            Content = "🙂",
-            FontFamily = new FontFamily("Segoe UI Emoji"),
-            FontSize = 16,
+            Content = EmojiContent("🙂", 18),
             Width = 44,
             MinHeight = 44,
             Margin = new Thickness(10, 0, 0, 0),
@@ -128,9 +131,18 @@ internal sealed class ChatWindow : Window
         row.Children.Add(_input);
         row.Children.Add(emojiButton);
         row.Children.Add(send);
+        bottom.Children.Add(row);
 
         BuildEmojiPanel();
-        bottom.Children.Add(row);
+
+        _notice = new TextBlock
+        {
+            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x81)),
+            Margin = new Thickness(2, 8, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
+
+        bottom.Children.Add(_notice);
 
         var close = new Button
         {
@@ -138,10 +150,11 @@ internal sealed class ChatWindow : Window
             Width = 110,
             Height = 30,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 10, 0, 0)
+            Margin = new Thickness(0, 10, 0, 0),
+            IsCancel = true
         };
 
-        close.Click += (_, _) => { DialogResult = false; };
+        close.Click += (_, _) => Close();
         bottom.Children.Add(close);
 
         Grid.SetRow(bottom, 2);
@@ -150,6 +163,11 @@ internal sealed class ChatWindow : Window
         Content = grid;
 
         RenderHistory();
+
+        // Ответ родителя должен появляться в открытом окне, а не после его переоткрытия.
+        _chat.Changed += OnChatChanged;
+        Closed += (_, _) => _chat.Changed -= OnChatChanged;
+
         Loaded += (_, _) =>
         {
             _input.Focus();
@@ -157,15 +175,19 @@ internal sealed class ChatWindow : Window
         };
     }
 
+    private void OnChatChanged() => Dispatcher.BeginInvoke(() =>
+    {
+        RenderHistory();
+        _scroll.ScrollToEnd();
+    });
+
     private void BuildEmojiPanel()
     {
         foreach (var emoji in Emoji.Popular)
         {
             var button = new Button
             {
-                Content = emoji,
-                FontFamily = new FontFamily("Segoe UI Emoji"),
-                FontSize = 18,
+                Content = EmojiContent(emoji, 20),
                 Width = 40,
                 Height = 34,
                 Margin = new Thickness(0, 0, 6, 6),
@@ -185,6 +207,15 @@ internal sealed class ChatWindow : Window
         }
     }
 
+    private static object EmojiContent(string emoji, double size)
+    {
+        var image = EmojiRenderer.Render(emoji, (int)Math.Round(size * 1.2));
+
+        return image is null
+            ? emoji
+            : new Image { Source = image, Width = size, Height = size };
+    }
+
     /// <summary>Enter отправляет, Shift+Enter переносит строку.</summary>
     private void OnInputKeyDown(object sender, KeyEventArgs e)
     {
@@ -197,8 +228,24 @@ internal sealed class ChatWindow : Window
 
     private void Submit()
     {
-        if (Text.Length == 0) return;
-        DialogResult = true;
+        var text = _input.Text.Trim();
+        if (text.Length == 0) return;
+
+        var error = _send(text);
+        if (error is not null)
+        {
+            ShowNotice(error);
+            return;
+        }
+
+        _input.Clear();
+        _notice.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowNotice(string notice)
+    {
+        _notice.Text = notice;
+        _notice.Visibility = Visibility.Visible;
     }
 
     private void RenderHistory()
@@ -247,10 +294,8 @@ internal sealed class ChatWindow : Window
             FontWeight = FontWeights.Bold
         });
 
-        line.Inlines.Add(new Run(message.Text)
-        {
-            Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7))
-        });
+        EmojiRenderer.AppendTo(line.Inlines, message.Text,
+            new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7)), line.FontSize);
 
         if (!message.FromParent)
         {

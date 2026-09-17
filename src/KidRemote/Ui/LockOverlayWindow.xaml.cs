@@ -49,6 +49,7 @@ public partial class LockOverlayWindow : Window
         _hintTimer.Tick += (_, _) => ResetHint();
 
         BuildEmojiPanel();
+        EmojiButton.Content = EmojiButtonContent("🙂");
     }
 
     /// <summary>Жук ползёт к случайной точке, иногда замирает и выбирает новую.</summary>
@@ -262,10 +263,8 @@ public partial class LockOverlayWindow : Window
             FontWeight = FontWeights.Bold
         });
 
-        line.Inlines.Add(new Run(message.Text)
-        {
-            Foreground = new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7))
-        });
+        EmojiRenderer.AppendTo(line.Inlines, message.Text,
+            new SolidColorBrush(Color.FromRgb(0xDC, 0xE4, 0xF7)), line.FontSize);
 
         if (!message.FromParent)
         {
@@ -336,9 +335,7 @@ public partial class LockOverlayWindow : Window
         {
             var button = new Button
             {
-                Content = emoji,
-                FontFamily = new FontFamily("Segoe UI Emoji"),
-                FontSize = 18,
+                Content = EmojiButtonContent(emoji),
                 Width = 40,
                 Height = 34,
                 Margin = new Thickness(0, 0, 6, 6),
@@ -355,6 +352,16 @@ public partial class LockOverlayWindow : Window
 
             EmojiPanel.Children.Add(button);
         }
+    }
+
+    /// <summary>Картинка для кнопки, с запасным вариантом текстом, если отрисовать не вышло.</summary>
+    private static object EmojiButtonContent(string emoji)
+    {
+        var image = EmojiRenderer.Render(emoji, 22);
+
+        return image is null
+            ? emoji
+            : new Image { Source = image, Width = 20, Height = 20 };
     }
 
     private void OnEmojiToggle(object sender, RoutedEventArgs e)

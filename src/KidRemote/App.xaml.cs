@@ -378,20 +378,10 @@ public partial class App : Application
     /// <summary>Реплика, отправленная прямо с экрана блокировки.</summary>
     private void SendFromLockScreen(string text)
     {
-        if (text.Length == 0) return;
+        var error = TrySendFromChild(text);
 
-        var since = DateTime.UtcNow - _lastChildMessageUtc;
-        if (since < ChildMessageCooldown)
-        {
-            var wait = Math.Max(1, (int)Math.Ceiling((ChildMessageCooldown - since).TotalSeconds));
-            _overlay.ShowChatNotice($"слишком часто — подождите {wait} с");
-            return;
-        }
-
-        _lastChildMessageUtc = DateTime.UtcNow;
-        _chat.Add("Ребёнок", text, fromParent: false);
-        _overlay.ClearChatInput();
-        _bot.PokeOutbox();
+        if (error is null) _overlay.ClearChatInput();
+        else _overlay.ShowChatNotice(error);
     }
 
     /// <summary>Чат с родителями. Пароля не требует — просить о помощи должно быть просто.</summary>
@@ -399,29 +389,12 @@ public partial class App : Application
     {
         CloseToast();
 
-        // Пока открыт чат, экран блокировки не лезет наверх — владелец окну не нужен,
-        // а привязка к окну, которое может закрыться, роняла диалог.
+        // Пока открыт чат, экран блокировки не лезет наверх.
         _overlay.SuspendGuard();
 
         try
         {
-            var window = new ChatWindow(_chat);
-            if (window.ShowDialog() != true) return;
-
-            var text = window.Text;
-            if (text.Length == 0) return;
-
-            var since = DateTime.UtcNow - _lastChildMessageUtc;
-            if (since < ChildMessageCooldown)
-            {
-                _tray.ShowMessage("KidRemote",
-                    $"Подождите {(int)(ChildMessageCooldown - since).TotalSeconds} с перед следующим сообщением.");
-                return;
-            }
-
-            _lastChildMessageUtc = DateTime.UtcNow;
-            _chat.Add("Ребёнок", text, fromParent: false);
-            _bot.PokeOutbox();
+            new ChatWindow(_chat, TrySendFromChild).ShowDialog();
         }
         catch (Exception ex)
         {
@@ -432,6 +405,25 @@ public partial class App : Application
         {
             _overlay.ResumeGuard();
         }
+    }
+
+    /// <summary>Общая отправка реплики: возвращает текст отказа либо null при успехе.</summary>
+    private string? TrySendFromChild(string text)
+    {
+        if (text.Length == 0) return null;
+
+        var since = DateTime.UtcNow - _lastChildMessageUtc;
+        if (since < ChildMessageCooldown)
+        {
+            var wait = Math.Max(1, (int)Math.Ceiling((ChildMessageCooldown - since).TotalSeconds));
+            return $"слишком часто — подождите {wait} с";
+        }
+
+        _lastChildMessageUtc = DateTime.UtcNow;
+        _chat.Add("Ребёнок", text, fromParent: false);
+        _bot.PokeOutbox();
+
+        return null;
     }
 
     /// <summary>Ответ родителя: показываем карточкой поверх игры и обновляем экран блокировки.</summary>
