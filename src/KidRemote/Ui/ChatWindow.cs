@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using KidRemote.Core;
 
@@ -63,40 +64,55 @@ internal sealed class ChatWindow : Window
 
         var bottom = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
 
+        // Поле и кнопка отправки в одну строку: так короткая реплика пишется одним движением.
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
         _input = new TextBox
         {
-            MinHeight = 70,
+            MinHeight = 44,
+            MaxHeight = 120,
             MaxLength = MaxLength,
             FontFamily = Mono,
             FontSize = 14,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.Wrap,
+            VerticalContentAlignment = VerticalAlignment.Center,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Padding = new Thickness(8, 6, 8, 6)
         };
 
-        bottom.Children.Add(_input);
+        _input.KeyDown += OnInputKeyDown;
 
-        var buttons = new StackPanel
+        var send = new Button
         {
-            Orientation = Orientation.Horizontal,
+            Content = "Отправить",
+            Width = 110,
+            MinHeight = 44,
+            Margin = new Thickness(10, 0, 0, 0),
+            IsDefault = true
+        };
+
+        send.Click += (_, _) => Submit();
+
+        Grid.SetColumn(_input, 0);
+        Grid.SetColumn(send, 1);
+        row.Children.Add(_input);
+        row.Children.Add(send);
+        bottom.Children.Add(row);
+
+        var close = new Button
+        {
+            Content = "Закрыть",
+            Width = 110,
+            Height = 30,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 12, 0, 0)
+            Margin = new Thickness(0, 10, 0, 0)
         };
 
-        var close = new Button { Content = "Закрыть", Width = 100, Height = 32, Margin = new Thickness(0, 0, 10, 0) };
         close.Click += (_, _) => { DialogResult = false; };
-
-        var send = new Button { Content = "Отправить", Width = 100, Height = 32, IsDefault = true };
-        send.Click += (_, _) =>
-        {
-            if (Text.Length == 0) return;
-            DialogResult = true;
-        };
-
-        buttons.Children.Add(close);
-        buttons.Children.Add(send);
-        bottom.Children.Add(buttons);
+        bottom.Children.Add(close);
 
         Grid.SetRow(bottom, 2);
         grid.Children.Add(bottom);
@@ -109,6 +125,22 @@ internal sealed class ChatWindow : Window
             _input.Focus();
             _scroll.ScrollToEnd();
         };
+    }
+
+    /// <summary>Enter отправляет, Shift+Enter переносит строку.</summary>
+    private void OnInputKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) return;
+
+        e.Handled = true;
+        Submit();
+    }
+
+    private void Submit()
+    {
+        if (Text.Length == 0) return;
+        DialogResult = true;
     }
 
     private void RenderHistory()
