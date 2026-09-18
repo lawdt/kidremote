@@ -76,8 +76,10 @@ internal sealed class ScheduleService : IDisposable
 
     private void Parse(string json)
     {
-        var tomorrow = DateTime.Now.AddDays(1);
-        var dayId = DayIds[(int)tomorrow.DayOfWeek];
+        // Утром важнее сегодняшние уроки, а ближе к обеду — уже завтрашние.
+        var now = DateTime.Now;
+        var day = now.Hour < _config.ScheduleTodayUntilHour ? now : now.AddDays(1);
+        var dayId = DayIds[(int)day.DayOfWeek];
 
         using var document = JsonDocument.Parse(json);
         var lines = new List<string>();
@@ -99,8 +101,10 @@ internal sealed class ScheduleService : IDisposable
         }
 
         Lines = lines;
+
+        var prefix = day.Date == now.Date ? "Сегодня" : "Завтра";
         Title = lines.Count > 0
-            ? $"Завтра, {DayNames[(int)tomorrow.DayOfWeek]}"
+            ? $"{prefix}, {DayNames[(int)day.DayOfWeek]}"
             : string.Empty;
     }
 

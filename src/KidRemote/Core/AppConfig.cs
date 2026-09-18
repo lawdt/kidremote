@@ -30,6 +30,10 @@ internal sealed class AppConfig
     [JsonPropertyName("scheduleProgramme")]
     public string ScheduleProgramme { get; set; } = "ru";
 
+    /// <summary>До этого часа показываем расписание на сегодня, позже — на завтра.</summary>
+    [JsonPropertyName("scheduleTodayUntilHour")]
+    public int ScheduleTodayUntilHour { get; set; } = 10;
+
     /// <summary>Как часто перечитывать расписание, минуты.</summary>
     [JsonPropertyName("scheduleRefreshMinutes")]
     public int ScheduleRefreshMinutes { get; set; } = 5;
