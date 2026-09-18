@@ -76,36 +76,60 @@ internal sealed class ScheduleService : IDisposable
 
     private void Parse(string json)
     {
-        // Утром важнее сегодняшние уроки, а ближе к обеду — уже завтрашние.
-        var now = DateTime.Now;
-        var day = now.Hour < _config.ScheduleTodayUntilHour ? now : now.AddDays(1);
-        var dayId = DayIds[(int)day.DayOfWeek];
-
         using var document = JsonDocument.Parse(json);
+
+        // Утром важнее сегодняшние уроки, а ближе к обеду — уже следующие.
+        var now = DateTime.Now;
+        var from = now.Hour < _config.ScheduleTodayUntilHour ? now : now.AddDays(1);
+
+        // Ищем ближайший учебный день: так пятничный вечер сам показывает понедельник,
+        // а выходные и каникулы пропускаются без отдельных правил.
+        for (var shift = 0; shift < 7; shift++)
+        {
+            var target = from.AddDays(shift);
+            var lines = ReadDay(document, DayIds[(int)target.DayOfWeek]);
+
+            if (lines.Count == 0) continue;
+
+            Lines = lines;
+            Title = BuildTitle(now, target);
+            return;
+        }
+
+        Lines = Array.Empty<string>();
+        Title = string.Empty;
+    }
+
+    private List<string> ReadDay(JsonDocument document, string dayId)
+    {
         var lines = new List<string>();
 
-        if (document.RootElement.TryGetProperty("days", out var days))
-        {
-            foreach (var day in days.EnumerateArray())
-            {
-                if (!day.TryGetProperty("id", out var id) || id.GetString() != dayId) continue;
-                if (!day.TryGetProperty("byClass", out var byClass)) continue;
-                if (!byClass.TryGetProperty(_config.ScheduleClass, out var lessons)) continue;
+        if (!document.RootElement.TryGetProperty("days", out var days)) return lines;
 
-                foreach (var lesson in lessons.EnumerateArray())
-                {
-                    var line = FormatLesson(lesson);
-                    if (line is not null) lines.Add(line);
-                }
+        foreach (var day in days.EnumerateArray())
+        {
+            if (!day.TryGetProperty("id", out var id) || id.GetString() != dayId) continue;
+            if (!day.TryGetProperty("byClass", out var byClass)) continue;
+            if (!byClass.TryGetProperty(_config.ScheduleClass, out var lessons)) continue;
+
+            foreach (var lesson in lessons.EnumerateArray())
+            {
+                var line = FormatLesson(lesson);
+                if (line is not null) lines.Add(line);
             }
         }
 
-        Lines = lines;
+        return lines;
+    }
 
-        var prefix = day.Date == now.Date ? "Сегодня" : "Завтра";
-        Title = lines.Count > 0
-            ? $"{prefix}, {DayNames[(int)day.DayOfWeek]}"
-            : string.Empty;
+    private static string BuildTitle(DateTime now, DateTime target)
+    {
+        var name = DayNames[(int)target.DayOfWeek];
+
+        if (target.Date == now.Date) return $"Сегодня, {name}";
+        if (target.Date == now.Date.AddDays(1)) return $"Завтра, {name}";
+
+        return char.ToUpper(name[0]) + name[1..];
     }
 
     private string? FormatLesson(JsonElement lesson)
