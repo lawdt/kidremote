@@ -95,9 +95,12 @@ internal sealed class AppConfig
     [JsonPropertyName("alerts")]
     public Dictionary<string, AlertSettings> Alerts { get; set; } = new();
 
-    /// <summary>Сколько времени остаётся после включения или пробуждения компьютера, секунды.</summary>
+    /// <summary>
+    /// Сколько времени остаётся после включения или пробуждения, если был включён безлимит.
+    /// Ноль означает, что компьютер просыпается заблокированным.
+    /// </summary>
     [JsonPropertyName("resumeGrantSeconds")]
-    public int ResumeGrantSeconds { get; set; } = 60;
+    public int ResumeGrantSeconds { get; set; }
 
     /// <summary>Пароль на пункты меню в трее. Хранится как соль и хэш, сам пароль нигде не лежит.</summary>
     [JsonPropertyName("adminPassword")]
