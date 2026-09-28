@@ -43,7 +43,7 @@ public partial class LockOverlayWindow : Window
     private const double LightsOutShare = 0.82;
 
     private static readonly Color DayBackground = Color.FromRgb(0x16, 0x21, 0x3C);
-    private static readonly Color NightBackground = Color.FromRgb(0x05, 0x07, 0x0E);
+    private static readonly Color NightBackground = Color.FromRgb(0x01, 0x01, 0x03);
 
     /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
     private static readonly TimeSpan HomeRest = TimeSpan.FromSeconds(30);
