@@ -29,7 +29,8 @@ public partial class LockOverlayWindow : Window
         AtHome,
         Peeking,
         Fetching,
-        Carrying
+        Carrying,
+        UnderLock
     }
 
     /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
@@ -74,6 +75,9 @@ public partial class LockOverlayWindow : Window
     private FrameworkElement? _carried;
     private double _walkPhase;
     private bool _secretFound;
+    private int _secretStage;
+    private DateTime _secretUntil;
+    private Point _secretSpot;
     private DateTime _atHomeSince;
     private DateTime _peekUntil;
     private DateTime _sleepUntil;
@@ -147,6 +151,12 @@ public partial class LockOverlayWindow : Window
                 StartFetch();
             }
 
+            return;
+        }
+
+        if (_bugMood == BugMood.UnderLock)
+        {
+            AdvanceSecret();
             return;
         }
 
@@ -405,20 +415,84 @@ public partial class LockOverlayWindow : Window
         var distance = Math.Sqrt(Math.Pow(bugX + 15 - centre.X, 2) + Math.Pow(bugY + 17 - centre.Y, 2));
         if (distance > SecretRadius) return;
 
-        Core.Log.Write("коровка нашла золотое яблоко под замком");
+        Core.Log.Write("коровка забралась под замок");
         _secretFound = true;
 
-        // Крошку, если несла, оставляем под замком — руки заняты находкой поважнее.
+        // Крошку, если несла, оставляет снаружи — под замком руки понадобятся.
         if (_carried is not null) StoreTreatWhereItIs();
 
-        _carried = CreateGoldenApple(centre);
+        // Заползла целиком: снаружи её не видно, дальше всё происходит под замком.
+        Bug.Visibility = Visibility.Collapsed;
 
-        Bugs.Children.Add(_carried);
-        Panel.SetZIndex(_carried, 1);
-
-        _bugMood = BugMood.Carrying;
+        _secretSpot = centre;
+        _secretStage = 1;
+        _secretUntil = DateTime.Now.AddSeconds(3);
+        _bugMood = BugMood.UnderLock;
         _bugPauseLeft = 0;
-        _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+    }
+
+    /// <summary>
+    /// Добыча яблока по шагам: сначала тишина, потом замок начинает подрагивать,
+    /// снова тишина — и коровка выбирается наружу с находкой.
+    /// </summary>
+    private void AdvanceSecret()
+    {
+        if (DateTime.Now < _secretUntil) return;
+
+        switch (_secretStage)
+        {
+            case 1:
+                _secretStage = 2;
+                _secretUntil = DateTime.Now.AddSeconds(5);
+                ShakeLock(TimeSpan.FromSeconds(5));
+                break;
+
+            case 2:
+                _secretStage = 3;
+                _secretUntil = DateTime.Now.AddSeconds(3);
+                GlyphShake.BeginAnimation(RotateTransform.AngleProperty, null);
+                break;
+
+            default:
+                _secretStage = 0;
+
+                _carried = CreateGoldenApple(_secretSpot);
+                Bugs.Children.Add(_carried);
+                Panel.SetZIndex(_carried, 1);
+
+                Bug.Visibility = Visibility.Visible;
+                Canvas.SetLeft(Bug, _secretSpot.X - 15);
+                Canvas.SetTop(Bug, _secretSpot.Y + 18);
+
+                _bugMood = BugMood.Carrying;
+                _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+                break;
+        }
+    }
+
+    /// <summary>Замок подрагивает: от стука или от возни под ним.</summary>
+    private void ShakeLock(TimeSpan duration)
+    {
+        var shake = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromMilliseconds(380),
+            RepeatBehavior = new RepeatBehavior(duration),
+            FillBehavior = FillBehavior.Stop
+        };
+
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(-7, KeyTime.FromPercent(0.2)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(7, KeyTime.FromPercent(0.5)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(-4, KeyTime.FromPercent(0.75)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+
+        GlyphShake.BeginAnimation(RotateTransform.AngleProperty, shake);
+    }
+
+    private void OnLockClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        ShakeLock(TimeSpan.FromMilliseconds(380));
     }
 
     private Point LockCentre()
