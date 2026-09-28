@@ -59,6 +59,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
     private const double SecretRadius = 90;
 
+    /// <summary>Передышка у домика после занесённой крошки, секунды.</summary>
+    private const double DeliveryPause = 5;
+
     /// <summary>Сколько коровка гоняется за отнятой крошкой, прежде чем обидеться.</summary>
     private static readonly TimeSpan ChaseLimit = TimeSpan.FromMinutes(1);
 
@@ -272,9 +275,15 @@ public partial class LockOverlayWindow : Window
             {
                 StoreTreat();
 
-                // Днём в домик не заходит: занесла добычу и сразу за следующей.
-                if (IsBugNight()) EnterHome();
-                else StartFetch();
+                if (IsBugNight())
+                {
+                    EnterHome();
+                    return;
+                }
+
+                // Днём в домик не заходит: занесла добычу, передохнула и снова за работу.
+                StartFetch();
+                _bugPauseLeft = DeliveryPause;
 
                 return;
             }
