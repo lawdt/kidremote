@@ -300,11 +300,7 @@ public partial class LockOverlayWindow : Window
 
         AnimateLegs(move);
 
-        if (_carried is not null)
-        {
-            Canvas.SetLeft(_carried, nextX + 9);
-            Canvas.SetTop(_carried, nextY - 12);
-        }
+        PlaceCarried(nextX, nextY);
 
         CheckSecret(nextX, nextY);
     }
@@ -602,16 +598,31 @@ public partial class LockOverlayWindow : Window
 
         var point = e.GetPosition(Bugs);
 
-        Canvas.SetLeft(_dragged, point.X - _dragOffset.X);
-        Canvas.SetTop(_dragged, point.Y - _dragOffset.Y);
+        var left = point.X - _dragOffset.X;
+        var top = point.Y - _dragOffset.Y;
+
+        Canvas.SetLeft(_dragged, left);
+        Canvas.SetTop(_dragged, top);
 
         if (!ReferenceEquals(_dragged, Bug)) return;
+
+        // Ноша едет вместе с коровкой, иначе остаётся висеть на прежнем месте.
+        PlaceCarried(left, top);
 
         // Коровка тяжёлая: дальше шестой части экрана её в курсоре не утащить.
         var limit = Bugs.ActualWidth / 6;
         var carried = Math.Sqrt(Math.Pow(point.X - _dragGrabbedAt.X, 2) + Math.Pow(point.Y - _dragGrabbedAt.Y, 2));
 
         if (carried >= limit) DropBug();
+    }
+
+    /// <summary>Держит ношу у коровки на спине, где бы та ни оказалась.</summary>
+    private void PlaceCarried(double bugX, double bugY)
+    {
+        if (_carried is null) return;
+
+        Canvas.SetLeft(_carried, bugX + 9);
+        Canvas.SetTop(_carried, bugY - 12);
     }
 
     private void OnLayerMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e) => EndDrag();
@@ -632,6 +643,7 @@ public partial class LockOverlayWindow : Window
         var y = Canvas.GetTop(Bug);
 
         EndDrag();
+        PlaceCarried(x, y);
 
         SayAt(Core.BugTalk.Drop(), x + 34, y - 44);
 
