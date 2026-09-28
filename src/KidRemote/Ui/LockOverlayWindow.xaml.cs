@@ -149,6 +149,7 @@ public partial class LockOverlayWindow : Window
         Bugs.MouseLeftButtonUp += OnLayerMouseUp;
 
         BuildEmojiPanel();
+        SkyDither.Fill = CreateDither();
         EmojiButton.Content = EmojiButtonContent("🙂");
 
         // Отступы по умолчанию у абзаца делают поле выше, чем нужно.
@@ -362,6 +363,44 @@ public partial class LockOverlayWindow : Window
         (1.00, Color.FromRgb(0x01, 0x01, 0x03), Color.FromRgb(0x05, 0x06, 0x0D))
     };
 
+    /// <summary>
+    /// Мелкий шум, размазывающий переходы. Восьми бит на канал не хватает, чтобы небо
+    /// было плавным на всю высоту экрана, и без этого видны горизонтальные ступени.
+    /// </summary>
+    private static ImageBrush CreateDither()
+    {
+        const int size = 64;
+
+        var pixels = new byte[size * size * 4];
+        var random = new Random(20260928);
+
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            var value = (byte)random.Next(0, 256);
+
+            pixels[i] = value;
+            pixels[i + 1] = value;
+            pixels[i + 2] = value;
+            pixels[i + 3] = 255;
+        }
+
+        var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(
+            size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+
+        bitmap.Freeze();
+
+        var brush = new ImageBrush(bitmap)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, size, size),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None
+        };
+
+        brush.Freeze();
+        return brush;
+    }
+
     private void UpdateDaylight()
     {
         var phase = DayPhase();
@@ -378,11 +417,23 @@ public partial class LockOverlayWindow : Window
         // Сглаживание по краям отрезка: переходы между опорными точками не видны стыками.
         amount = amount * amount * (3 - 2 * amount);
 
-        Background = new LinearGradientBrush(
-            Blend(from.Top, to.Top, amount),
-            Blend(from.Bottom, to.Bottom, amount),
-            new Point(0.5, 0),
-            new Point(0.5, 1));
+        var top = Blend(from.Top, to.Top, amount);
+        var bottom = Blend(from.Bottom, to.Bottom, amount);
+
+        // Промежуточная остановка смягчает середину: чистый двухцветный переход
+        // на всю высоту экрана расслаивается заметнее.
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5, 0),
+            EndPoint = new Point(0.5, 1)
+        };
+
+        brush.GradientStops.Add(new GradientStop(top, 0));
+        brush.GradientStops.Add(new GradientStop(Blend(top, bottom, 0.45), 0.55));
+        brush.GradientStops.Add(new GradientStop(bottom, 1));
+        brush.Freeze();
+
+        Background = brush;
     }
 
     private static Color Blend(Color from, Color to, double amount) => Color.FromRgb(
