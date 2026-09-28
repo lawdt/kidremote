@@ -213,9 +213,16 @@
                 <Path Data="M3,24 L29,4 L55,24 Z" Fill="#8C4A2F"/>
                 <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="26" Fill="#B9794E"/>
                 <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="3" Fill="#7A4027"/>
-                <Path Data="M19,49 L19,34 A10,10 0 0 1 39,34 L39,49 Z" Fill="#2A1A12"/>
-                <Rectangle x:Name="HomeWindow" Canvas.Left="14" Canvas.Top="28" Width="10" Height="10"
-                           Fill="#3A2718" Stroke="#7A4027" StrokeThickness="1" RadiusX="2" RadiusY="2"/>
+                <!-- Дверь сдвинута влево, чтобы справа поместилось окно. -->
+                <Path Data="M13,49 L13,36 A8,8 0 0 1 29,36 L29,49 Z" Fill="#2A1A12"/>
+                <Rectangle Canvas.Left="20" Canvas.Top="42" Width="2" Height="2" Fill="#C9A227" RadiusX="1" RadiusY="1"/>
+
+                <!-- Окно: рама, стекло и переплёт крестом. -->
+                <Rectangle Canvas.Left="33" Canvas.Top="29" Width="14" Height="14" Fill="#7A4027"/>
+                <Rectangle x:Name="HomeWindow" Canvas.Left="35" Canvas.Top="31" Width="10" Height="10" Fill="#3A2718"/>
+                <Rectangle Canvas.Left="39.4" Canvas.Top="31" Width="1.2" Height="10" Fill="#7A4027"/>
+                <Rectangle Canvas.Left="35" Canvas.Top="35.4" Width="10" Height="1.2" Fill="#7A4027"/>
+                <Rectangle Canvas.Left="32" Canvas.Top="43" Width="16" Height="1.6" Fill="#6B4A21"/>
             </Canvas>
 
 
