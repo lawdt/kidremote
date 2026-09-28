@@ -59,6 +59,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
     private const double SecretRadius = 90;
 
+    /// <summary>Как часто коровка соблазняется смайликом из переписки.</summary>
+    private const double ChatTheftChance = 0.3;
+
     /// <summary>Передышка у домика после занесённой крошки, секунды.</summary>
     private const double DeliveryPause = 5;
 
@@ -90,6 +93,9 @@ public partial class LockOverlayWindow : Window
     private readonly Random _random = new();
 
     private readonly List<FrameworkElement> _treats = new();
+
+    /// <summary>Смайлики, что сейчас видны в переписке: коровка считает их едой.</summary>
+    private readonly List<Image> _chatEmoji = new();
 
     private Point _bugTarget;
     private Point _bugHome;
@@ -424,6 +430,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Идём за ближайшей крошкой; когда их не осталось — просто гуляем.</summary>
     private void StartFetch()
     {
+        // Смайлик из чата — добыча поинтереснее обычной крошки.
+        if (_treats.Count == 0 || _random.NextDouble() < ChatTheftChance) StealFromChat();
+
         var bug = new Point(Canvas.GetLeft(Bug), Canvas.GetTop(Bug));
 
         FrameworkElement? nearest = null;
@@ -1093,6 +1102,8 @@ public partial class LockOverlayWindow : Window
 
         foreach (var message in messages) ChatLines.Children.Add(ChatLine(message));
 
+        CollectChatEmoji();
+
         ChatPanel.Visibility = Visibility.Visible;
         Dispatcher.BeginInvoke(new Action(() => ChatScroll.ScrollToEnd()), DispatcherPriority.Loaded);
 
@@ -1107,6 +1118,68 @@ public partial class LockOverlayWindow : Window
                 FillBehavior = FillBehavior.Stop
             });
         }
+    }
+
+    private void CollectChatEmoji()
+    {
+        _chatEmoji.Clear();
+
+        foreach (var child in ChatLines.Children)
+        {
+            if (child is not TextBlock line) continue;
+
+            foreach (var inline in line.Inlines)
+            {
+                if (inline is InlineUIContainer container && container.Child is Image image)
+                    _chatEmoji.Add(image);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Утаскивает смайлик из переписки: на его месте остаётся пустое место, а сам он
+    /// превращается в добычу и уезжает в домик.
+    /// </summary>
+    private FrameworkElement? StealFromChat()
+    {
+        var candidates = _chatEmoji.Where(image => image.Opacity > 0.5).ToList();
+        if (candidates.Count == 0) return null;
+
+        var victim = candidates[_random.Next(candidates.Count)];
+
+        Point at;
+
+        try
+        {
+            at = victim.TransformToVisual(Bugs).Transform(new Point(0, 0));
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (at.X <= 0 || at.Y <= 0) return null;
+
+        var loot = new Image
+        {
+            Source = victim.Source,
+            Width = 18,
+            Height = 18,
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        loot.MouseLeftButtonDown += OnTreatGrab;
+
+        Canvas.SetLeft(loot, at.X);
+        Canvas.SetTop(loot, at.Y);
+
+        Bugs.Children.Add(loot);
+        _treats.Add(loot);
+
+        // В переписке смайлик пропадает — до следующей перерисовки чата.
+        victim.Opacity = 0;
+
+        return loot;
     }
 
     private static TextBlock ChatLine(Core.ChatMessage message)
