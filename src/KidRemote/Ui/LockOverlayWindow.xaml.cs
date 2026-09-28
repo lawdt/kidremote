@@ -42,9 +42,6 @@ public partial class LockOverlayWindow : Window
     /// <summary>До этого момента ночи в окошке ещё горит свет.</summary>
     private const double LightsOutShare = 0.82;
 
-    private static readonly Color DayBackground = Color.FromRgb(0x16, 0x21, 0x3C);
-    private static readonly Color NightBackground = Color.FromRgb(0x01, 0x01, 0x03);
-
     /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
     private static readonly TimeSpan HomeRest = TimeSpan.FromSeconds(30);
 
@@ -170,6 +167,7 @@ public partial class LockOverlayWindow : Window
         const double step = 0.033;
 
         PlaceHome(width, height);
+        UpdateDaylight();
 
         if (ReferenceEquals(_dragged, Bug)) return;
 
@@ -346,23 +344,51 @@ public partial class LockOverlayWindow : Window
     private bool IsBugNight() => DayPhase() >= DayShare;
 
     /// <summary>
-    /// Фон плавно темнеет к ночи и светлеет к утру. Переход растянут на четверть суток,
-    /// чтобы смена не бросалась в глаза рывком.
+    /// Небо задаётся опорными точками суток и плавно перетекает между ними: у горизонта
+    /// на рассвете и закате теплее, чем вверху, как это и бывает.
     /// </summary>
+    private static readonly (double Phase, Color Top, Color Bottom)[] Sky =
+    {
+        (0.00, Color.FromRgb(0x01, 0x01, 0x03), Color.FromRgb(0x05, 0x06, 0x0D)),
+        (0.05, Color.FromRgb(0x08, 0x0C, 0x1E), Color.FromRgb(0x2A, 0x1E, 0x2A)),
+        (0.10, Color.FromRgb(0x16, 0x20, 0x3E), Color.FromRgb(0x6B, 0x3C, 0x33)),
+        (0.16, Color.FromRgb(0x1A, 0x2B, 0x4E), Color.FromRgb(0x4E, 0x54, 0x62)),
+        (0.30, Color.FromRgb(0x14, 0x22, 0x40), Color.FromRgb(0x2A, 0x49, 0x6E)),
+        (0.50, Color.FromRgb(0x13, 0x20, 0x3C), Color.FromRgb(0x27, 0x45, 0x6A)),
+        (0.58, Color.FromRgb(0x16, 0x1F, 0x38), Color.FromRgb(0x4A, 0x3C, 0x50)),
+        (0.64, Color.FromRgb(0x12, 0x18, 0x2C), Color.FromRgb(0x73, 0x3A, 0x2C)),
+        (0.70, Color.FromRgb(0x0A, 0x0E, 0x1C), Color.FromRgb(0x33, 0x1E, 0x24)),
+        (0.80, Color.FromRgb(0x03, 0x04, 0x0A), Color.FromRgb(0x0C, 0x0E, 0x18)),
+        (1.00, Color.FromRgb(0x01, 0x01, 0x03), Color.FromRgb(0x05, 0x06, 0x0D))
+    };
+
     private void UpdateDaylight()
     {
         var phase = DayPhase();
 
-        // Простая кривая: рассвет в начале суток, закат к концу светлой части.
-        var light = phase < DayShare
-            ? Math.Min(1, phase / (DayShare * 0.35))
-            : Math.Max(0, 1 - (phase - DayShare) / ((1 - DayShare) * 0.45));
+        var index = 0;
+        while (index < Sky.Length - 2 && phase > Sky[index + 1].Phase) index++;
 
-        Background = new SolidColorBrush(Color.FromRgb(
-            Mix(NightBackground.R, DayBackground.R, light),
-            Mix(NightBackground.G, DayBackground.G, light),
-            Mix(NightBackground.B, DayBackground.B, light)));
+        var from = Sky[index];
+        var to = Sky[index + 1];
+
+        var span = to.Phase - from.Phase;
+        var amount = span <= 0 ? 0 : (phase - from.Phase) / span;
+
+        // Сглаживание по краям отрезка: переходы между опорными точками не видны стыками.
+        amount = amount * amount * (3 - 2 * amount);
+
+        Background = new LinearGradientBrush(
+            Blend(from.Top, to.Top, amount),
+            Blend(from.Bottom, to.Bottom, amount),
+            new Point(0.5, 0),
+            new Point(0.5, 1));
     }
+
+    private static Color Blend(Color from, Color to, double amount) => Color.FromRgb(
+        Mix(from.R, to.R, amount),
+        Mix(from.G, to.G, amount),
+        Mix(from.B, to.B, amount));
 
     private static byte Mix(byte from, byte to, double amount) =>
         (byte)Math.Round(from + (to - from) * Math.Clamp(amount, 0, 1));
@@ -1068,8 +1094,6 @@ public partial class LockOverlayWindow : Window
     /// <summary>Часы и ночная приписка. Вызывается раз в секунду, пока экран закрыт.</summary>
     internal void UpdateClock(DateTime now, bool lateHours)
     {
-        UpdateDaylight();
-
         Clock.Text = now.ToString("HH:mm");
 
         var date = now.ToString("dddd, d MMMM", Russian);
