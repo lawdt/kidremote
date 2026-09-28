@@ -19,15 +19,14 @@ internal static class Keyboards
         {
             new()
             {
-                InlineKeyboardButton.Create("+15 мин", "ask:add:900"),
-                InlineKeyboardButton.Create("+30 мин", "ask:add:1800"),
-                InlineKeyboardButton.Create("+1 час", "ask:add:3600")
+                InlineKeyboardButton.Create("+1 мин", "ask:add:60"),
+                InlineKeyboardButton.Create("+5 мин", "ask:add:300"),
+                InlineKeyboardButton.Create("+15 мин", "ask:add:900")
             },
             new()
             {
-                InlineKeyboardButton.Create("−5 мин", "ask:sub:300"),
-                InlineKeyboardButton.Create("−15 мин", "ask:sub:900"),
-                InlineKeyboardButton.Create("−30 мин", "ask:sub:1800")
+                InlineKeyboardButton.Create("+30 мин", "ask:add:1800"),
+                InlineKeyboardButton.Create("+1 час", "ask:add:3600")
             },
             new()
             {
