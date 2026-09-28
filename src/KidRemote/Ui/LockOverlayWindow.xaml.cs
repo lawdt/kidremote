@@ -45,10 +45,13 @@ public partial class LockOverlayWindow : Window
     private static readonly TimeSpan OfflineNap = TimeSpan.FromSeconds(20);
 
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
-    private const double SecretRadius = 70;
+    private const double SecretRadius = 90;
 
-    /// <summary>С такого расстояния испуганная коровка предпочитает спрятаться дома.</summary>
-    private const double HomeLureRadius = 300;
+    /// <summary>С такого расстояния испуганная коровка может спрятаться дома.</summary>
+    private const double HomeLureRadius = 200;
+
+    /// <summary>Но не всегда: иначе её невозможно прогнать мимо домика к другим местам.</summary>
+    private const double HomeLureChance = 0.35;
 
     private static readonly Color[] TreatColors =
     {
@@ -77,6 +80,7 @@ public partial class LockOverlayWindow : Window
     private double _walkPhase;
     private FrameworkElement? _dragged;
     private FrameworkElement? _fetchTreat;
+    private DateTime _nextBeg;
     private Point _dragGrabbedAt;
     private Vector _dragOffset;
     private bool _secretFound;
@@ -198,6 +202,13 @@ public partial class LockOverlayWindow : Window
         if (_bugMood == BugMood.Fetching && _fetchTreat is not null)
         {
             _bugTarget = new Point(Canvas.GetLeft(_fetchTreat) - 8, Canvas.GetTop(_fetchTreat) - 8);
+
+            // Добычу держат в курсоре и не отдают — коровка время от времени возмущается.
+            if (ReferenceEquals(_dragged, _fetchTreat) && DateTime.Now >= _nextBeg)
+            {
+                _nextBeg = DateTime.Now.AddSeconds(4 + _random.NextDouble() * 5);
+                SayAt(Core.BugTalk.Beg(), Canvas.GetLeft(Bug) + 34, Canvas.GetTop(Bug) - 44);
+            }
         }
 
         // Курсор проверяем до паузы: сидящая коровка тоже должна срываться с места.
@@ -828,8 +839,9 @@ public partial class LockOverlayWindow : Window
         // Уже спешит домой или тащит добычу — цель менять нельзя, иначе никогда не дойдёт.
         if (_bugMood is BugMood.GoingHome or BugMood.Carrying) return true;
 
-        // Домик неподалёку — коровка ныряет туда, так её и загоняют курсором.
-        if (Math.Sqrt(Math.Pow(x - (_bugHome.X + 29), 2) + Math.Pow(y - (_bugHome.Y + 20), 2)) < HomeLureRadius)
+        // Домик неподалёку — иногда коровка ныряет туда, так её и загоняют курсором.
+        if (Math.Sqrt(Math.Pow(x - (_bugHome.X + 29), 2) + Math.Pow(y - (_bugHome.Y + 20), 2)) < HomeLureRadius
+            && _random.NextDouble() < HomeLureChance)
         {
             _bugMood = BugMood.GoingHome;
             _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
