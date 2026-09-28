@@ -13,7 +13,7 @@ namespace KidRemote.Ui;
 /// </summary>
 internal sealed class AlertFrameWindow : Window
 {
-    private const double BorderWidth = 10;
+    private const double BorderWidth = 4;
     private const double RestingOpacity = 0.9;
 
     private readonly Border _frame;
