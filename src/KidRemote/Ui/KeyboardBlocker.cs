@@ -36,18 +36,29 @@ internal sealed class KeyboardBlocker : IDisposable
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        var message = wParam.ToInt32();
-        if (nCode >= 0 && (message == NativeMethods.WM_KEYDOWN || message == NativeMethods.WM_SYSKEYDOWN))
+        if (nCode >= 0)
         {
             var info = Marshal.PtrToStructure<NativeMethods.KBDLLHOOKSTRUCT>(lParam);
-            if (ShouldBlock(info.vkCode)) return new IntPtr(1);
+
+            // Ввод в собственное окно пропускаем: иначе не написать сообщение родителям.
+            if (!IsOwnWindowActive() || ShouldBlockAlways(info.vkCode)) return new IntPtr(1);
         }
 
         return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
     }
 
-    private static bool ShouldBlock(uint vkCode) =>
+    /// <summary>Эти сочетания глушим всегда: ими выходят из блокировки.</summary>
+    private static bool ShouldBlockAlways(uint vkCode) =>
         vkCode is VK_TAB or VK_ESCAPE or VK_LWIN or VK_RWIN or VK_F4;
+
+    private static bool IsOwnWindowActive()
+    {
+        var window = NativeMethods.GetForegroundWindow();
+        if (window == IntPtr.Zero) return false;
+
+        NativeMethods.GetWindowThreadProcessId(window, out var pid);
+        return pid == (uint)Environment.ProcessId;
+    }
 
     public void Dispose() => Disable();
 }

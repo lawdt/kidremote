@@ -15,6 +15,7 @@ internal sealed class OverlayManager : IDisposable
 {
     private readonly AppConfig _config;
     private readonly KeyboardBlocker _keyboard = new();
+    private readonly GameFreezer _freezer = new();
     private readonly List<LockOverlayWindow> _windows = new();
     private readonly DispatcherTimer _keepOnTop;
     private readonly DispatcherTimer _clock;
@@ -76,6 +77,14 @@ internal sealed class OverlayManager : IDisposable
         // Новая фраза на каждую блокировку.
         _phrase = Motivation.Next();
 
+        // Игра продолжает читать клавиатуру и джойстик даже без фокуса, поэтому
+        // на время блокировки её процесс замораживается.
+        if (_config.FreezeGameWhenLocked)
+        {
+            var game = GameFreezer.GameInFront(_config);
+            if (game != 0) _freezer.Freeze(game);
+        }
+
         // Эксклюзивный полноэкранный режим перекрывает любые чужие окна — сворачиваем игру,
         // иначе ребёнок просто не увидит блокировку.
         if (_config.MinimizeForegroundOnLock)
@@ -123,6 +132,7 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Stop();
         _clock.Stop();
         _keyboard.Disable();
+        _freezer.ThawAll();
 
         foreach (var window in _windows) window.Topmost = false;
     }
@@ -179,6 +189,7 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Stop();
         _clock.Stop();
         _keyboard.Disable();
+        _freezer.ThawAll();
 
         foreach (var window in _windows) window.CloseForReal();
         _windows.Clear();
@@ -216,6 +227,9 @@ internal sealed class OverlayManager : IDisposable
     public void Dispose()
     {
         Hide();
+
+        // Даже при аварийном завершении игра не должна остаться замороженной.
+        _freezer.ThawAll();
         _keyboard.Dispose();
     }
 }

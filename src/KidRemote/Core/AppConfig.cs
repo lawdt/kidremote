@@ -80,6 +80,10 @@ internal sealed class AppConfig
     [JsonPropertyName("overlayCorner")]
     public string OverlayCorner { get; set; } = "TopRight";
 
+    /// <summary>Замораживать процесс игры на время блокировки, чтобы не проходил ввод с джойстика.</summary>
+    [JsonPropertyName("freezeGameWhenLocked")]
+    public bool FreezeGameWhenLocked { get; set; } = true;
+
     /// <summary>Сворачивать активное окно при блокировке — помогает выйти из эксклюзивного полноэкранного режима.</summary>
     [JsonPropertyName("minimizeForegroundOnLock")]
     public bool MinimizeForegroundOnLock { get; set; } = true;
