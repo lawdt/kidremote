@@ -168,7 +168,7 @@ public partial class LockOverlayWindow : Window
             if (_sleepEnded)
             {
                 _sleepEnded = false;
-                SetWindowLit(true);
+                SetWindowLit(IsBugNight());
             }
 
             // Ночью из домика не выходит: сначала сидит при свете, потом гасит его и спит.
@@ -178,7 +178,7 @@ public partial class LockOverlayWindow : Window
                 return;
             }
 
-            SetWindowLit(true);
+            SetWindowLit(false);
 
             // Пока рядом крутится курсор, коровка отсиживается и наружу не идёт.
             if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130))
@@ -257,10 +257,19 @@ public partial class LockOverlayWindow : Window
 
         if (distance < 6)
         {
-            if (_bugMood == BugMood.GoingHome || _bugMood == BugMood.Carrying)
+            if (_bugMood == BugMood.Carrying)
             {
-                if (_bugMood == BugMood.Carrying) StoreTreat();
+                StoreTreat();
 
+                // Днём в домик не заходит: занесла добычу и сразу за следующей.
+                if (IsBugNight()) EnterHome();
+                else StartFetch();
+
+                return;
+            }
+
+            if (_bugMood == BugMood.GoingHome)
+            {
                 EnterHome();
                 return;
             }
@@ -469,7 +478,7 @@ public partial class LockOverlayWindow : Window
         _atHomeSince = DateTime.Now;
         Bug.Visibility = Visibility.Collapsed;
 
-        SetWindowLit(true);
+        SetWindowLit(IsBugNight());
     }
 
     /// <summary>Свет в окошке показывает, дома ли коровка.</summary>
@@ -820,8 +829,8 @@ public partial class LockOverlayWindow : Window
         _bugMood = BugMood.AtHome;
         _atHomeSince = DateTime.Now;
 
-        // Пока идёт сон, окно остаётся тёмным.
-        SetWindowLit(DateTime.Now >= _sleepUntil);
+        // Пока идёт сон, окно остаётся тёмным. Днём оно и так не горит.
+        SetWindowLit(DateTime.Now >= _sleepUntil && IsBugNight());
     }
 
     private void Say(string text)
