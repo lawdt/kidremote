@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using KidRemote;
 
 namespace KidRemote.Ui;
 
@@ -65,7 +66,21 @@ internal sealed class PasswordWindow : Window
         panel.Children.Add(buttons);
 
         Content = panel;
-        Loaded += (_, _) => _input.Focus();
+
+        // Окно открывается поверх игры или экрана блокировки, и без принудительной
+        // активации фокус остаётся у них — пароль набирать некуда.
+        Loaded += (_, _) => TakeFocus();
+    }
+
+    private void TakeFocus()
+    {
+        Activate();
+
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero) Interop.NativeMethods.SetForegroundWindow(handle);
+
+        _input.Focus();
+        Keyboard.Focus(_input);
     }
 
     private void Submit()

@@ -60,6 +60,14 @@ internal sealed class UnlockWindow : Window
         panel.Children.Add(cancel);
 
         Content = panel;
+
+        Loaded += (_, _) =>
+        {
+            Activate();
+
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero) Interop.NativeMethods.SetForegroundWindow(handle);
+        };
     }
 
     private void Apply(long seconds)

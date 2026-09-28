@@ -170,7 +170,13 @@ internal sealed class ChatWindow : Window
 
         Loaded += (_, _) =>
         {
+            Activate();
+
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero) Interop.NativeMethods.SetForegroundWindow(handle);
+
             _input.Focus();
+            Keyboard.Focus(_input);
             _scroll.ScrollToEnd();
         };
     }
