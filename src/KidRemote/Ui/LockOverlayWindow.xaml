@@ -214,6 +214,8 @@
                 <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="26" Fill="#B9794E"/>
                 <Rectangle Canvas.Left="10" Canvas.Top="23" Width="38" Height="3" Fill="#7A4027"/>
                 <Path Data="M19,49 L19,34 A10,10 0 0 1 39,34 L39,49 Z" Fill="#2A1A12"/>
+                <Rectangle x:Name="HomeWindow" Canvas.Left="14" Canvas.Top="28" Width="10" Height="10"
+                           Fill="#3A2718" Stroke="#7A4027" StrokeThickness="1" RadiusX="2" RadiusY="2"/>
             </Canvas>
 
 
@@ -242,6 +244,32 @@
                 <Ellipse Canvas.Left="9" Canvas.Top="0" Width="12" Height="11" Fill="#15171C"/>
                 <Ellipse Canvas.Left="7" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
                 <Ellipse Canvas.Left="20" Canvas.Top="1" Width="3" Height="3" Fill="#E8ECF7"/>
+
+                <Rectangle x:Name="LegL1" Canvas.Left="-7" Canvas.Top="12" Width="9" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="1,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegL1R"/></Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="LegL2" Canvas.Left="-8" Canvas.Top="20" Width="10" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="1,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegL2R"/></Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="LegL3" Canvas.Left="-7" Canvas.Top="28" Width="9" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="1,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegL3R"/></Rectangle.RenderTransform>
+                </Rectangle>
+
+                <Rectangle x:Name="LegR1" Canvas.Left="28" Canvas.Top="12" Width="9" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="0,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegR1R"/></Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="LegR2" Canvas.Left="28" Canvas.Top="20" Width="10" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="0,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegR2R"/></Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="LegR3" Canvas.Left="28" Canvas.Top="28" Width="9" Height="2.6"
+                           Fill="#15171C" RadiusX="1" RadiusY="1" RenderTransformOrigin="0,0.5">
+                    <Rectangle.RenderTransform><RotateTransform x:Name="LegR3R"/></Rectangle.RenderTransform>
+                </Rectangle>
 
                 <Ellipse Canvas.Left="1" Canvas.Top="7" Width="28" Height="27"
                          Fill="#D7262F" Stroke="#15171C" StrokeThickness="1.2"/>

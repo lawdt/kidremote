@@ -35,6 +35,17 @@ public partial class LockOverlayWindow : Window
     /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
     private static readonly TimeSpan HomeRest = TimeSpan.FromSeconds(30);
 
+    /// <summary>Столько стуков она терпит, прежде чем обидеться и погасить свет.</summary>
+    private const int KnocksToAnnoy = 5;
+
+    /// <summary>А столько нужно, чтобы добудиться до обиженной.</summary>
+    private const int KnocksToWake = 10;
+
+    private static readonly TimeSpan OfflineNap = TimeSpan.FromSeconds(20);
+
+    /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
+    private const double SecretRadius = 62;
+
     private static readonly Color[] TreatColors =
     {
         Color.FromRgb(0xE8, 0x7A, 0x2B),
@@ -58,12 +69,16 @@ public partial class LockOverlayWindow : Window
     private Point _bugHome;
     private BugMood _bugMood = BugMood.Wander;
     private FrameworkElement? _carried;
+    private double _walkPhase;
     private Point _lockCenter;
     private bool _lockCentreKnown;
     private bool _secretFound;
     private DateTime _atHomeSince;
     private DateTime _peekUntil;
+    private DateTime _sleepUntil;
     private int _knocks;
+    private int _knocksWhileAsleep;
+    private bool _sleepEnded = true;
     private double _bugAngle;
     private double _bugPauseLeft;
     private bool _allowClose;
@@ -108,6 +123,15 @@ public partial class LockOverlayWindow : Window
 
         if (_bugMood == BugMood.AtHome)
         {
+            // Обиженная коровка отсыпается и на возню снаружи не отзывается.
+            if (DateTime.Now < _sleepUntil) return;
+
+            if (_sleepEnded)
+            {
+                _sleepEnded = false;
+                SetWindowLit(true);
+            }
+
             // Пока рядом крутится курсор, коровка отсиживается и наружу не идёт.
             if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130))
             {
@@ -198,6 +222,8 @@ public partial class LockOverlayWindow : Window
         Canvas.SetLeft(Bug, nextX);
         Canvas.SetTop(Bug, nextY);
 
+        AnimateLegs(move);
+
         if (_carried is not null)
         {
             Canvas.SetLeft(_carried, nextX + 9);
@@ -205,6 +231,25 @@ public partial class LockOverlayWindow : Window
         }
 
         CheckSecret(nextX, nextY);
+    }
+
+    /// <summary>
+    /// Шесть ножек качаются противофазой: правая средняя идёт вместе с левыми крайними,
+    /// как у настоящего насекомого.
+    /// </summary>
+    private void AnimateLegs(double moved)
+    {
+        _walkPhase += moved * 0.55;
+
+        var swing = Math.Sin(_walkPhase) * 15;
+
+        LegL1R.Angle = swing;
+        LegL3R.Angle = swing;
+        LegR2R.Angle = swing;
+
+        LegL2R.Angle = -swing;
+        LegR1R.Angle = -swing;
+        LegR3R.Angle = -swing;
     }
 
     /// <summary>Домик стоит в левом нижнем углу и не мешает ни расписанию, ни чату.</summary>
@@ -310,12 +355,24 @@ public partial class LockOverlayWindow : Window
         _bugPauseLeft = 0;
         _atHomeSince = DateTime.Now;
         Bug.Visibility = Visibility.Collapsed;
+
+        SetWindowLit(true);
+    }
+
+    /// <summary>Свет в окошке показывает, дома ли коровка.</summary>
+    private void SetWindowLit(bool lit)
+    {
+        HomeWindow.Fill = new SolidColorBrush(lit
+            ? Color.FromRgb(0xFF, 0xD9, 0x66)
+            : Color.FromRgb(0x3A, 0x27, 0x18));
     }
 
     private void LeaveHome()
     {
         _bugMood = BugMood.Wander;
         Bug.Visibility = Visibility.Visible;
+
+        SetWindowLit(false);
 
         Canvas.SetLeft(Bug, _bugHome.X + 40);
         Canvas.SetTop(Bug, _bugHome.Y - 20);
@@ -336,8 +393,9 @@ public partial class LockOverlayWindow : Window
         if (centre.X <= 0) return;
 
         var distance = Math.Sqrt(Math.Pow(bugX + 15 - centre.X, 2) + Math.Pow(bugY + 17 - centre.Y, 2));
-        if (distance > 46) return;
+        if (distance > SecretRadius) return;
 
+        Core.Log.Write("коровка нашла золотое яблоко под замком");
         _secretFound = true;
         _carried = CreateGoldenApple(centre);
 
@@ -419,14 +477,50 @@ public partial class LockOverlayWindow : Window
         return apple;
     }
 
-    /// <summary>Стук в домик: коровка высовывается, смотрит на курсор и ворчит.</summary>
+    /// <summary>
+    /// Стук в домик. После пятого коровка гасит свет и отсыпается, не отвечая;
+    /// разбудить её может только совсем настойчивый — и тогда она кричит.
+    /// </summary>
     private void OnHomeClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         e.Handled = true;
 
-        if (_bugMood != BugMood.AtHome && _bugMood != BugMood.Peeking) return;
+        if (_bugMood is not (BugMood.AtHome or BugMood.Peeking)) return;
 
-        Say(Core.BugTalk.Next(_knocks++));
+        if (DateTime.Now < _sleepUntil)
+        {
+            _knocksWhileAsleep++;
+            if (_knocksWhileAsleep < KnocksToWake) return;
+
+            // Достучались: один раз проорала и снова спать.
+            _knocksWhileAsleep = 0;
+            _sleepUntil = DateTime.Now.Add(OfflineNap);
+            _sleepEnded = true;
+
+            Peek(Core.BugTalk.Shout());
+            return;
+        }
+
+        _knocks++;
+
+        if (_knocks >= KnocksToAnnoy)
+        {
+            _knocks = 0;
+            _knocksWhileAsleep = 0;
+            _sleepUntil = DateTime.Now.Add(OfflineNap);
+            _sleepEnded = true;
+
+            HideBack();
+            SetWindowLit(false);
+            return;
+        }
+
+        Peek(Core.BugTalk.Random());
+    }
+
+    private void Peek(string text)
+    {
+        Say(text);
 
         _bugMood = BugMood.Peeking;
         _peekUntil = DateTime.Now.AddSeconds(2.6);
@@ -445,6 +539,9 @@ public partial class LockOverlayWindow : Window
 
         _bugMood = BugMood.AtHome;
         _atHomeSince = DateTime.Now;
+
+        // Пока идёт сон, окно остаётся тёмным.
+        SetWindowLit(DateTime.Now >= _sleepUntil);
     }
 
     private void Say(string text)
