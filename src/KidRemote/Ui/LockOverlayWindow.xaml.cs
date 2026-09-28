@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Shapes;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -25,8 +26,22 @@ public partial class LockOverlayWindow : Window
     {
         Wander,
         GoingHome,
-        AtHome
+        AtHome,
+        Peeking,
+        Fetching,
+        Carrying
     }
+
+    /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
+    private static readonly TimeSpan HomeRest = TimeSpan.FromSeconds(30);
+
+    private static readonly Color[] TreatColors =
+    {
+        Color.FromRgb(0xE8, 0x7A, 0x2B),
+        Color.FromRgb(0xD7, 0x4B, 0x5E),
+        Color.FromRgb(0x6F, 0xB2, 0x4C),
+        Color.FromRgb(0xE3, 0xC4, 0x4F)
+    };
 
     private const string DefaultHint = "напишите родителям и нажмите Enter";
 
@@ -37,9 +52,15 @@ public partial class LockOverlayWindow : Window
     private readonly DispatcherTimer _hintTimer;
     private readonly Random _random = new();
 
+    private readonly List<FrameworkElement> _treats = new();
+
     private Point _bugTarget;
     private Point _bugHome;
     private BugMood _bugMood = BugMood.Wander;
+    private FrameworkElement? _carried;
+    private DateTime _atHomeSince;
+    private DateTime _peekUntil;
+    private int _knocks;
     private double _bugAngle;
     private double _bugPauseLeft;
     private bool _allowClose;
@@ -84,8 +105,28 @@ public partial class LockOverlayWindow : Window
 
         if (_bugMood == BugMood.AtHome)
         {
-            // Домой коровка уходит надолго: наружу её выманивает только курсор.
-            if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130)) LeaveHome();
+            // Пока рядом крутится курсор, коровка отсиживается и наружу не идёт.
+            if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130))
+            {
+                _atHomeSince = DateTime.Now;
+                return;
+            }
+
+            // Оставили в покое — выходит и принимается таскать вкусности домой.
+            if (DateTime.Now - _atHomeSince > HomeRest)
+            {
+                LeaveHome();
+                StartFetch();
+            }
+
+            return;
+        }
+
+        if (_bugMood == BugMood.Peeking)
+        {
+            LookAtCursor();
+
+            if (DateTime.Now >= _peekUntil) HideBack();
             return;
         }
 
@@ -112,9 +153,17 @@ public partial class LockOverlayWindow : Window
 
         if (distance < 6)
         {
-            if (_bugMood == BugMood.GoingHome)
+            if (_bugMood == BugMood.GoingHome || _bugMood == BugMood.Carrying)
             {
+                if (_bugMood == BugMood.Carrying) StoreTreat();
+
                 EnterHome();
+                return;
+            }
+
+            if (_bugMood == BugMood.Fetching)
+            {
+                PickUpTreat();
                 return;
             }
 
@@ -139,8 +188,17 @@ public partial class LockOverlayWindow : Window
         BugRotation.Angle = _bugAngle;
 
         var move = (fleeing ? BugFleeSpeed : BugSpeed) * step;
-        Canvas.SetLeft(Bug, x + dx / distance * move);
-        Canvas.SetTop(Bug, y + dy / distance * move);
+        var nextX = x + dx / distance * move;
+        var nextY = y + dy / distance * move;
+
+        Canvas.SetLeft(Bug, nextX);
+        Canvas.SetTop(Bug, nextY);
+
+        if (_carried is not null)
+        {
+            Canvas.SetLeft(_carried, nextX + 9);
+            Canvas.SetTop(_carried, nextY - 12);
+        }
     }
 
     /// <summary>Домик стоит в левом нижнем углу и не мешает ни расписанию, ни чату.</summary>
@@ -152,12 +210,99 @@ public partial class LockOverlayWindow : Window
 
         Canvas.SetLeft(BugHome, _bugHome.X);
         Canvas.SetTop(BugHome, _bugHome.Y);
+
+        ScatterTreats(width, height);
+    }
+
+    /// <summary>Крошки по экрану: коровке есть чем заняться, пока время закрыто.</summary>
+    private void ScatterTreats(double width, double height)
+    {
+        const int count = 9;
+        const double margin = 80;
+
+        for (var i = 0; i < count; i++)
+        {
+            var treat = new Ellipse
+            {
+                Width = 11,
+                Height = 11,
+                Fill = new SolidColorBrush(TreatColors[_random.Next(TreatColors.Length)]),
+                Stroke = new SolidColorBrush(Color.FromRgb(0x2A, 0x1A, 0x12)),
+                StrokeThickness = 1
+            };
+
+            Canvas.SetLeft(treat, margin + _random.NextDouble() * Math.Max(1, width - margin * 2));
+            Canvas.SetTop(treat, margin + _random.NextDouble() * Math.Max(1, height - margin * 2));
+
+            Bugs.Children.Add(treat);
+            _treats.Add(treat);
+        }
+    }
+
+    /// <summary>Идём за ближайшей крошкой; когда их не осталось — просто гуляем.</summary>
+    private void StartFetch()
+    {
+        var bug = new Point(Canvas.GetLeft(Bug), Canvas.GetTop(Bug));
+
+        FrameworkElement? nearest = null;
+        var best = double.MaxValue;
+
+        foreach (var treat in _treats)
+        {
+            var point = new Point(Canvas.GetLeft(treat), Canvas.GetTop(treat));
+            var distance = Math.Sqrt(Math.Pow(point.X - bug.X, 2) + Math.Pow(point.Y - bug.Y, 2));
+
+            if (distance >= best) continue;
+
+            best = distance;
+            nearest = treat;
+        }
+
+        if (nearest is null)
+        {
+            _bugMood = BugMood.Wander;
+            PickTarget(Bugs.ActualWidth, Bugs.ActualHeight);
+            return;
+        }
+
+        _bugMood = BugMood.Fetching;
+        _bugPauseLeft = 0;
+        _bugTarget = new Point(Canvas.GetLeft(nearest) - 8, Canvas.GetTop(nearest) - 8);
+    }
+
+    private void PickUpTreat()
+    {
+        var bug = new Point(Canvas.GetLeft(Bug), Canvas.GetTop(Bug));
+
+        _carried = _treats.FirstOrDefault(treat =>
+            Math.Sqrt(Math.Pow(Canvas.GetLeft(treat) - bug.X, 2) + Math.Pow(Canvas.GetTop(treat) - bug.Y, 2)) < 40);
+
+        if (_carried is null)
+        {
+            StartFetch();
+            return;
+        }
+
+        _treats.Remove(_carried);
+        Panel.SetZIndex(_carried, 1);
+
+        _bugMood = BugMood.Carrying;
+        _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+    }
+
+    private void StoreTreat()
+    {
+        if (_carried is null) return;
+
+        Bugs.Children.Remove(_carried);
+        _carried = null;
     }
 
     private void EnterHome()
     {
         _bugMood = BugMood.AtHome;
         _bugPauseLeft = 0;
+        _atHomeSince = DateTime.Now;
         Bug.Visibility = Visibility.Collapsed;
     }
 
@@ -170,6 +315,63 @@ public partial class LockOverlayWindow : Window
         Canvas.SetTop(Bug, _bugHome.Y - 20);
 
         _bugTarget = new Point(_bugHome.X + 260, _bugHome.Y - 160);
+    }
+
+    /// <summary>Стук в домик: коровка высовывается, смотрит на курсор и ворчит.</summary>
+    private void OnHomeClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+
+        if (_bugMood != BugMood.AtHome && _bugMood != BugMood.Peeking) return;
+
+        Say(Core.BugTalk.Next(_knocks++));
+
+        _bugMood = BugMood.Peeking;
+        _peekUntil = DateTime.Now.AddSeconds(2.6);
+
+        Bug.Visibility = Visibility.Visible;
+        Canvas.SetLeft(Bug, _bugHome.X + 14);
+        Canvas.SetTop(Bug, _bugHome.Y + 12);
+
+        LookAtCursor();
+    }
+
+    private void HideBack()
+    {
+        Bug.Visibility = Visibility.Collapsed;
+        SpeechBubble.Visibility = Visibility.Collapsed;
+
+        _bugMood = BugMood.AtHome;
+        _atHomeSince = DateTime.Now;
+    }
+
+    private void Say(string text)
+    {
+        SpeechText.Text = text;
+        SpeechBubble.Visibility = Visibility.Visible;
+
+        Canvas.SetLeft(SpeechBubble, _bugHome.X + 70);
+        Canvas.SetTop(SpeechBubble, _bugHome.Y - 16);
+    }
+
+    /// <summary>Разворачивает коровку мордочкой к курсору.</summary>
+    private void LookAtCursor()
+    {
+        try
+        {
+            var screen = Forms.Cursor.Position;
+            var cursor = PointFromScreen(new Point(screen.X, screen.Y));
+
+            var dx = cursor.X - (Canvas.GetLeft(Bug) + 15);
+            var dy = cursor.Y - (Canvas.GetTop(Bug) + 17);
+
+            _bugAngle = Math.Atan2(dy, dx) * 180 / Math.PI + 90;
+            BugRotation.Angle = _bugAngle;
+        }
+        catch
+        {
+            // Курсор недоступен — оставляем как есть.
+        }
     }
 
     private bool CursorNear(double x, double y, double radius)
@@ -221,6 +423,16 @@ public partial class LockOverlayWindow : Window
 
         const double margin = 30;
         _bugPauseLeft = 0;
+
+        // Домик рядом — прячемся туда, так его и можно загнать курсором.
+        if (_bugMood == BugMood.Wander &&
+            Math.Sqrt(Math.Pow(x - (_bugHome.X + 29), 2) + Math.Pow(y - (_bugHome.Y + 20), 2)) < 220)
+        {
+            _bugMood = BugMood.GoingHome;
+            _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+            return true;
+        }
+
         _bugTarget = new Point(
             Math.Clamp(x + dx / distance * BugFleeDistance, margin, Math.Max(margin, width - margin)),
             Math.Clamp(y + dy / distance * BugFleeDistance, margin, Math.Max(margin, height - margin)));
