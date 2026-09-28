@@ -133,12 +133,6 @@ public partial class LockOverlayWindow : Window
             return;
         }
 
-        if (_bugPauseLeft > 0)
-        {
-            _bugPauseLeft -= step;
-            return;
-        }
-
         var x = Canvas.GetLeft(Bug);
         var y = Canvas.GetTop(Bug);
         if (double.IsNaN(x) || double.IsNaN(y))
@@ -148,7 +142,14 @@ public partial class LockOverlayWindow : Window
             PickTarget(width, height);
         }
 
+        // Курсор проверяем до паузы: сидящая коровка тоже должна срываться с места.
         var fleeing = Flee(x, y, width, height);
+
+        if (!fleeing && _bugPauseLeft > 0)
+        {
+            _bugPauseLeft -= step;
+            return;
+        }
 
         var dx = _bugTarget.X - x;
         var dy = _bugTarget.Y - y;
