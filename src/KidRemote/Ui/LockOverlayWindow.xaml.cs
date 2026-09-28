@@ -33,6 +33,18 @@ public partial class LockOverlayWindow : Window
         UnderLock
     }
 
+    /// <summary>Сутки коровки: за время блокировки успевает смениться день и ночь.</summary>
+    private static readonly TimeSpan BugDay = TimeSpan.FromMinutes(6);
+
+    /// <summary>Какая часть суток светлая.</summary>
+    private const double DayShare = 0.62;
+
+    /// <summary>До этого момента ночи в окошке ещё горит свет.</summary>
+    private const double LightsOutShare = 0.82;
+
+    private static readonly Color DayBackground = Color.FromRgb(0x16, 0x21, 0x3C);
+    private static readonly Color NightBackground = Color.FromRgb(0x05, 0x07, 0x0E);
+
     /// <summary>Сколько коровка отсиживается дома, если её не трогают.</summary>
     private static readonly TimeSpan HomeRest = TimeSpan.FromSeconds(30);
 
@@ -80,6 +92,7 @@ public partial class LockOverlayWindow : Window
     private double _walkPhase;
     private FrameworkElement? _dragged;
     private FrameworkElement? _fetchTreat;
+    private readonly DateTime _dayStart = DateTime.Now;
     private DateTime _nextBeg;
     private Point _dragGrabbedAt;
     private Vector _dragOffset;
@@ -158,6 +171,15 @@ public partial class LockOverlayWindow : Window
                 SetWindowLit(true);
             }
 
+            // Ночью из домика не выходит: сначала сидит при свете, потом гасит его и спит.
+            if (IsBugNight())
+            {
+                SetWindowLit(DayPhase() < LightsOutShare);
+                return;
+            }
+
+            SetWindowLit(true);
+
             // Пока рядом крутится курсор, коровка отсиживается и наружу не идёт.
             if (CursorNear(_bugHome.X + 29, _bugHome.Y + 25, 130))
             {
@@ -196,6 +218,15 @@ public partial class LockOverlayWindow : Window
             x = width / 2;
             y = height / 2;
             PickTarget(width, height);
+        }
+
+        // Ночь застала снаружи — бросает дела и возвращается в домик.
+        if (IsBugNight() && _bugMood is BugMood.Wander or BugMood.Fetching)
+        {
+            _bugMood = BugMood.GoingHome;
+            _bugPauseLeft = 0;
+            _fetchTreat = null;
+            _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
         }
 
         // Крошку могли утащить мышью — цель едет вместе с ней.
@@ -277,6 +308,33 @@ public partial class LockOverlayWindow : Window
 
         CheckSecret(nextX, nextY);
     }
+
+    /// <summary>Доля прошедших суток коровки: ноль — рассвет, единица — снова рассвет.</summary>
+    private double DayPhase() => (DateTime.Now - _dayStart).TotalSeconds % BugDay.TotalSeconds / BugDay.TotalSeconds;
+
+    private bool IsBugNight() => DayPhase() >= DayShare;
+
+    /// <summary>
+    /// Фон плавно темнеет к ночи и светлеет к утру. Переход растянут на четверть суток,
+    /// чтобы смена не бросалась в глаза рывком.
+    /// </summary>
+    private void UpdateDaylight()
+    {
+        var phase = DayPhase();
+
+        // Простая кривая: рассвет в начале суток, закат к концу светлой части.
+        var light = phase < DayShare
+            ? Math.Min(1, phase / (DayShare * 0.35))
+            : Math.Max(0, 1 - (phase - DayShare) / ((1 - DayShare) * 0.45));
+
+        Background = new SolidColorBrush(Color.FromRgb(
+            Mix(NightBackground.R, DayBackground.R, light),
+            Mix(NightBackground.G, DayBackground.G, light),
+            Mix(NightBackground.B, DayBackground.B, light)));
+    }
+
+    private static byte Mix(byte from, byte to, double amount) =>
+        (byte)Math.Round(from + (to - from) * Math.Clamp(amount, 0, 1));
 
     /// <summary>
     /// Шесть ножек качаются противофазой: правая средняя идёт вместе с левыми крайними,
@@ -931,6 +989,8 @@ public partial class LockOverlayWindow : Window
     /// <summary>Часы и ночная приписка. Вызывается раз в секунду, пока экран закрыт.</summary>
     internal void UpdateClock(DateTime now, bool lateHours)
     {
+        UpdateDaylight();
+
         Clock.Text = now.ToString("HH:mm");
 
         var date = now.ToString("dddd, d MMMM", Russian);
