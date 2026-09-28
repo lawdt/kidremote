@@ -59,6 +59,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
     private const double SecretRadius = 90;
 
+    /// <summary>Сколько коровка гоняется за отнятой крошкой, прежде чем обидеться.</summary>
+    private static readonly TimeSpan ChaseLimit = TimeSpan.FromMinutes(1);
+
     /// <summary>С такого расстояния испуганная коровка может спрятаться дома.</summary>
     private const double HomeLureRadius = 200;
 
@@ -94,6 +97,7 @@ public partial class LockOverlayWindow : Window
     private FrameworkElement? _fetchTreat;
     private readonly DateTime _dayStart = DateTime.Now;
     private DateTime _nextBeg;
+    private DateTime _chaseUntil;
     private Point _dragGrabbedAt;
     private Vector _dragOffset;
     private bool _secretFound;
@@ -239,6 +243,13 @@ public partial class LockOverlayWindow : Window
             {
                 _nextBeg = DateTime.Now.AddSeconds(4 + _random.NextDouble() * 5);
                 SayAt(Core.BugTalk.Beg(), Canvas.GetLeft(Bug) + 34, Canvas.GetTop(Bug) - 44);
+            }
+
+            // Гонялась долго и без толку — обижается и уходит домой.
+            if (_chaseUntil != default && DateTime.Now >= _chaseUntil)
+            {
+                GiveUpChase();
+                return;
             }
         }
 
@@ -448,9 +459,22 @@ public partial class LockOverlayWindow : Window
 
         _treats.Remove(_carried);
         _fetchTreat = null;
+        _chaseUntil = default;
         Panel.SetZIndex(_carried, 1);
 
         _bugMood = BugMood.Carrying;
+        _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+    }
+
+    private void GiveUpChase()
+    {
+        _chaseUntil = default;
+        _fetchTreat = null;
+
+        SayAt(Core.BugTalk.Offend(), Canvas.GetLeft(Bug) + 34, Canvas.GetTop(Bug) - 44);
+
+        _bugMood = BugMood.GoingHome;
+        _bugPauseLeft = 0;
         _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
     }
 
@@ -577,7 +601,23 @@ public partial class LockOverlayWindow : Window
         if (sender is not FrameworkElement treat) return;
 
         e.Handled = true;
+
+        // Крошку отобрали прямо из лапок: коровка бросается догонять.
+        if (ReferenceEquals(treat, _carried)) TakeAway(treat);
+
         StartDrag(treat, e);
+    }
+
+    /// <summary>Отнятая ноша возвращается в общий список, а коровка переходит в погоню.</summary>
+    private void TakeAway(FrameworkElement treat)
+    {
+        _carried = null;
+        _treats.Add(treat);
+
+        _fetchTreat = treat;
+        _bugMood = BugMood.Fetching;
+        _bugPauseLeft = 0;
+        _chaseUntil = DateTime.Now.Add(ChaseLimit);
     }
 
     /// <summary>Коровку тоже можно поднять, но далеко она в курсоре не удержится.</summary>
