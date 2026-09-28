@@ -149,7 +149,6 @@ public partial class LockOverlayWindow : Window
         Bugs.MouseLeftButtonUp += OnLayerMouseUp;
 
         BuildEmojiPanel();
-        SkyDither.Fill = CreateDither();
         EmojiButton.Content = EmojiButtonContent("🙂");
 
         // Отступы по умолчанию у абзаца делают поле выше, чем нужно.
@@ -364,42 +363,15 @@ public partial class LockOverlayWindow : Window
     };
 
     /// <summary>
-    /// Мелкий шум, размазывающий переходы. Восьми бит на канал не хватает, чтобы небо
-    /// было плавным на всю высоту экрана, и без этого видны горизонтальные ступени.
+    /// Небо рисуется картинкой в один пиксель шириной. Градиентная кисть WPF раскладывает
+    /// плавный переход ступенями — на восьми битах соседние строки округляются к одному
+    /// значению. Здесь же каждая строка считается отдельно и округляется со смещением,
+    /// поэтому граница уровней рассыпается и полос не видно.
     /// </summary>
-    private static ImageBrush CreateDither()
-    {
-        const int size = 64;
+    private static readonly double[] DitherRow = { -0.375, 0.125, -0.125, 0.375 };
 
-        var pixels = new byte[size * size * 4];
-        var random = new Random(20260928);
-
-        for (var i = 0; i < pixels.Length; i += 4)
-        {
-            var value = (byte)random.Next(0, 256);
-
-            pixels[i] = value;
-            pixels[i + 1] = value;
-            pixels[i + 2] = value;
-            pixels[i + 3] = 255;
-        }
-
-        var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(
-            size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
-
-        bitmap.Freeze();
-
-        var brush = new ImageBrush(bitmap)
-        {
-            TileMode = TileMode.Tile,
-            Viewport = new Rect(0, 0, size, size),
-            ViewportUnits = BrushMappingMode.Absolute,
-            Stretch = Stretch.None
-        };
-
-        brush.Freeze();
-        return brush;
-    }
+    private Color _skyTop;
+    private Color _skyBottom;
 
     private void UpdateDaylight()
     {
@@ -420,20 +392,45 @@ public partial class LockOverlayWindow : Window
         var top = Blend(from.Top, to.Top, amount);
         var bottom = Blend(from.Bottom, to.Bottom, amount);
 
-        // Промежуточная остановка смягчает середину: чистый двухцветный переход
-        // на всю высоту экрана расслаивается заметнее.
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0.5, 0),
-            EndPoint = new Point(0.5, 1)
-        };
+        // Перерисовываем, только когда цвет действительно сменился.
+        if (top == _skyTop && bottom == _skyBottom) return;
 
-        brush.GradientStops.Add(new GradientStop(top, 0));
-        brush.GradientStops.Add(new GradientStop(Blend(top, bottom, 0.45), 0.55));
-        brush.GradientStops.Add(new GradientStop(bottom, 1));
+        _skyTop = top;
+        _skyBottom = bottom;
+
+        Background = PaintSky(top, bottom, (int)Math.Round(Math.Max(2, ActualHeight)));
+    }
+
+    private static ImageBrush PaintSky(Color top, Color bottom, int height)
+    {
+        var pixels = new byte[height * 4];
+
+        for (var y = 0; y < height; y++)
+        {
+            var t = y / (double)(height - 1);
+            var shift = DitherRow[y % DitherRow.Length];
+
+            pixels[y * 4 + 0] = Dither(top.B, bottom.B, t, shift);
+            pixels[y * 4 + 1] = Dither(top.G, bottom.G, t, shift);
+            pixels[y * 4 + 2] = Dither(top.R, bottom.R, t, shift);
+            pixels[y * 4 + 3] = 255;
+        }
+
+        var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(
+            1, height, 96, 96, PixelFormats.Bgra32, null, pixels, 4);
+
+        bitmap.Freeze();
+
+        var brush = new ImageBrush(bitmap) { Stretch = Stretch.Fill };
         brush.Freeze();
 
-        Background = brush;
+        return brush;
+    }
+
+    private static byte Dither(byte from, byte to, double t, double shift)
+    {
+        var value = from + (to - from) * t + shift;
+        return (byte)Math.Clamp(Math.Round(value), 0, 255);
     }
 
     private static Color Blend(Color from, Color to, double amount) => Color.FromRgb(

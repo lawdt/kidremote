@@ -214,12 +214,6 @@
 
         </StackPanel>
 
-        <!-- Едва заметный шум поверх неба: без него плавный градиент идёт ступенями. -->
-        <Rectangle x:Name="SkyDither"
-                   Grid.ColumnSpan="3"
-                   Opacity="0.05"
-                   IsHitTestVisible="False"/>
-
         <Canvas x:Name="HomeLayer" Grid.ColumnSpan="3">
             <!-- Домик, куда коровка изредка забирается отсидеться. -->
             <Canvas x:Name="BugHome" Cursor="Hand" MouseLeftButtonDown="OnHomeClick" Width="58" Height="50" Opacity="0.9">
