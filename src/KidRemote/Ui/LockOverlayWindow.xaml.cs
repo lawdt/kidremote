@@ -58,6 +58,9 @@ public partial class LockOverlayWindow : Window
     private Point _bugHome;
     private BugMood _bugMood = BugMood.Wander;
     private FrameworkElement? _carried;
+    private Point _lockCenter;
+    private bool _lockCentreKnown;
+    private bool _secretFound;
     private DateTime _atHomeSince;
     private DateTime _peekUntil;
     private int _knocks;
@@ -199,6 +202,8 @@ public partial class LockOverlayWindow : Window
             Canvas.SetLeft(_carried, nextX + 9);
             Canvas.SetTop(_carried, nextY - 12);
         }
+
+        CheckSecret(nextX, nextY);
     }
 
     /// <summary>Домик стоит в левом нижнем углу и не мешает ни расписанию, ни чату.</summary>
@@ -315,6 +320,102 @@ public partial class LockOverlayWindow : Window
         Canvas.SetTop(Bug, _bugHome.Y - 20);
 
         _bugTarget = new Point(_bugHome.X + 260, _bugHome.Y - 160);
+    }
+
+    /// <summary>
+    /// Под замком спрятано золотое яблоко. Само оно коровке не попадается — забрести
+    /// туда её надо загнать курсором.
+    /// </summary>
+    private void CheckSecret(double bugX, double bugY)
+    {
+        if (_secretFound || _carried is not null) return;
+        if (_bugMood is not (BugMood.Wander or BugMood.Fetching)) return;
+
+        var centre = LockCentre();
+        if (centre.X <= 0) return;
+
+        var distance = Math.Sqrt(Math.Pow(bugX + 15 - centre.X, 2) + Math.Pow(bugY + 17 - centre.Y, 2));
+        if (distance > 46) return;
+
+        _secretFound = true;
+        _carried = CreateGoldenApple(centre);
+
+        Bugs.Children.Add(_carried);
+        Panel.SetZIndex(_carried, 1);
+
+        _bugMood = BugMood.Carrying;
+        _bugPauseLeft = 0;
+        _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+    }
+
+    private Point LockCentre()
+    {
+        if (_lockCentreKnown) return _lockCenter;
+        if (Glyph.ActualWidth <= 0 || Bugs.ActualWidth <= 0) return new Point(0, 0);
+
+        try
+        {
+            _lockCenter = Glyph.TransformToVisual(Bugs)
+                .Transform(new Point(Glyph.ActualWidth / 2, Glyph.ActualHeight / 2));
+
+            _lockCentreKnown = true;
+        }
+        catch
+        {
+            return new Point(0, 0);
+        }
+
+        return _lockCenter;
+    }
+
+    /// <summary>Яблоко нарочно крупное: находка должна быть заметной.</summary>
+    private static Canvas CreateGoldenApple(Point at)
+    {
+        var apple = new Canvas { Width = 46, Height = 50 };
+
+        apple.Children.Add(new Ellipse
+        {
+            Width = 44,
+            Height = 40,
+            Fill = new RadialGradientBrush(Color.FromRgb(0xFF, 0xE9, 0x8A), Color.FromRgb(0xD4, 0x9A, 0x16))
+            {
+                GradientOrigin = new Point(0.35, 0.3),
+                Center = new Point(0.4, 0.35)
+            },
+            Stroke = new SolidColorBrush(Color.FromRgb(0x8A, 0x60, 0x0C)),
+            StrokeThickness = 1.4
+        });
+
+        Canvas.SetTop(apple.Children[0], 10);
+
+        var stem = new Rectangle
+        {
+            Width = 4,
+            Height = 12,
+            Fill = new SolidColorBrush(Color.FromRgb(0x6B, 0x4A, 0x21)),
+            RadiusX = 2,
+            RadiusY = 2
+        };
+
+        Canvas.SetLeft(stem, 21);
+        Canvas.SetTop(stem, 2);
+        apple.Children.Add(stem);
+
+        var leaf = new Ellipse
+        {
+            Width = 16,
+            Height = 9,
+            Fill = new SolidColorBrush(Color.FromRgb(0x5A, 0xA8, 0x3C))
+        };
+
+        Canvas.SetLeft(leaf, 25);
+        Canvas.SetTop(leaf, 3);
+        apple.Children.Add(leaf);
+
+        Canvas.SetLeft(apple, at.X - 23);
+        Canvas.SetTop(apple, at.Y - 25);
+
+        return apple;
     }
 
     /// <summary>Стук в домик: коровка высовывается, смотрит на курсор и ворчит.</summary>
