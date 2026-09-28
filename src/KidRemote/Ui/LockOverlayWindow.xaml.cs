@@ -65,6 +65,7 @@ public partial class LockOverlayWindow : Window
 
     private readonly DispatcherTimer _bugTimer;
     private readonly DispatcherTimer _hintTimer;
+    private readonly DispatcherTimer _speechTimer;
     private readonly Random _random = new();
 
     private readonly List<FrameworkElement> _treats = new();
@@ -74,6 +75,10 @@ public partial class LockOverlayWindow : Window
     private BugMood _bugMood = BugMood.Wander;
     private FrameworkElement? _carried;
     private double _walkPhase;
+    private FrameworkElement? _dragged;
+    private FrameworkElement? _fetchTreat;
+    private Point _dragGrabbedAt;
+    private Vector _dragOffset;
     private bool _secretFound;
     private int _secretStage;
     private DateTime _secretUntil;
@@ -106,6 +111,16 @@ public partial class LockOverlayWindow : Window
         _hintTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         _hintTimer.Tick += (_, _) => ResetHint();
 
+        _speechTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
+        _speechTimer.Tick += (_, _) =>
+        {
+            _speechTimer.Stop();
+            if (_bugMood != BugMood.Peeking) SpeechBubble.Visibility = Visibility.Collapsed;
+        };
+
+        Bugs.MouseMove += OnLayerMouseMove;
+        Bugs.MouseLeftButtonUp += OnLayerMouseUp;
+
         BuildEmojiPanel();
         EmojiButton.Content = EmojiButtonContent("🙂");
 
@@ -125,6 +140,8 @@ public partial class LockOverlayWindow : Window
         const double step = 0.033;
 
         PlaceHome(width, height);
+
+        if (ReferenceEquals(_dragged, Bug)) return;
 
         if (_bugMood == BugMood.AtHome)
         {
@@ -175,6 +192,12 @@ public partial class LockOverlayWindow : Window
             x = width / 2;
             y = height / 2;
             PickTarget(width, height);
+        }
+
+        // Крошку могли утащить мышью — цель едет вместе с ней.
+        if (_bugMood == BugMood.Fetching && _fetchTreat is not null)
+        {
+            _bugTarget = new Point(Canvas.GetLeft(_fetchTreat) - 8, Canvas.GetTop(_fetchTreat) - 8);
         }
 
         // Курсор проверяем до паузы: сидящая коровка тоже должна срываться с места.
@@ -296,6 +319,9 @@ public partial class LockOverlayWindow : Window
             Canvas.SetLeft(treat, margin + _random.NextDouble() * Math.Max(1, width - margin * 2));
             Canvas.SetTop(treat, margin + _random.NextDouble() * Math.Max(1, height - margin * 2));
 
+            treat.Cursor = System.Windows.Input.Cursors.Hand;
+            treat.MouseLeftButtonDown += OnTreatGrab;
+
             Bugs.Children.Add(treat);
             _treats.Add(treat);
         }
@@ -329,6 +355,7 @@ public partial class LockOverlayWindow : Window
 
         _bugMood = BugMood.Fetching;
         _bugPauseLeft = 0;
+        _fetchTreat = nearest;
         _bugTarget = new Point(Canvas.GetLeft(nearest) - 8, Canvas.GetTop(nearest) - 8);
     }
 
@@ -346,6 +373,7 @@ public partial class LockOverlayWindow : Window
         }
 
         _treats.Remove(_carried);
+        _fetchTreat = null;
         Panel.SetZIndex(_carried, 1);
 
         _bugMood = BugMood.Carrying;
@@ -468,6 +496,94 @@ public partial class LockOverlayWindow : Window
                 _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
                 break;
         }
+    }
+
+    private void OnTreatGrab(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement treat) return;
+
+        e.Handled = true;
+        StartDrag(treat, e);
+    }
+
+    /// <summary>Коровку тоже можно поднять, но далеко она в курсоре не удержится.</summary>
+    private void OnBugGrab(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_bugMood is BugMood.AtHome or BugMood.UnderLock) return;
+
+        e.Handled = true;
+        StartDrag(Bug, e);
+    }
+
+    private void StartDrag(FrameworkElement element, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        var point = e.GetPosition(Bugs);
+
+        _dragged = element;
+        _dragGrabbedAt = point;
+        _dragOffset = new Vector(point.X - Canvas.GetLeft(element), point.Y - Canvas.GetTop(element));
+
+        Panel.SetZIndex(element, 2);
+        Bugs.CaptureMouse();
+    }
+
+    private void OnLayerMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_dragged is null) return;
+
+        var point = e.GetPosition(Bugs);
+
+        Canvas.SetLeft(_dragged, point.X - _dragOffset.X);
+        Canvas.SetTop(_dragged, point.Y - _dragOffset.Y);
+
+        if (!ReferenceEquals(_dragged, Bug)) return;
+
+        // Коровка тяжёлая: дальше шестой части экрана её в курсоре не утащить.
+        var limit = Bugs.ActualWidth / 6;
+        var carried = Math.Sqrt(Math.Pow(point.X - _dragGrabbedAt.X, 2) + Math.Pow(point.Y - _dragGrabbedAt.Y, 2));
+
+        if (carried >= limit) DropBug();
+    }
+
+    private void OnLayerMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e) => EndDrag();
+
+    private void EndDrag()
+    {
+        if (_dragged is null) return;
+
+        Panel.SetZIndex(_dragged, 0);
+        _dragged = null;
+        Bugs.ReleaseMouseCapture();
+    }
+
+    /// <summary>Сорвалась с курсора: ворчит, приходит в себя и идёт дальше по делам.</summary>
+    private void DropBug()
+    {
+        var x = Canvas.GetLeft(Bug);
+        var y = Canvas.GetTop(Bug);
+
+        EndDrag();
+
+        SayAt(Core.BugTalk.Drop(), x + 34, y - 44);
+
+        _bugPauseLeft = 1.2;
+        _bugAngle = _random.NextDouble() * 360;
+        BugRotation.Angle = _bugAngle;
+
+        if (_bugMood == BugMood.Wander) PickTarget(Bugs.ActualWidth, Bugs.ActualHeight);
+    }
+
+    /// <summary>Реплика в произвольном месте экрана, а не только у домика.</summary>
+    private void SayAt(string text, double x, double y)
+    {
+        SpeechText.Text = text;
+        SpeechBubble.Visibility = Visibility.Visible;
+
+        Canvas.SetLeft(SpeechBubble, Math.Max(8, Math.Min(x, Math.Max(8, HomeLayer.ActualWidth - 280))));
+        Canvas.SetTop(SpeechBubble, Math.Max(8, y));
+
+        _speechTimer.Stop();
+        _speechTimer.Start();
     }
 
     /// <summary>Замок подрагивает: от стука или от возни под ним.</summary>
@@ -688,6 +804,9 @@ public partial class LockOverlayWindow : Window
         {
             return false;
         }
+
+        // За своей крошкой коровка идёт смело, даже если та в курсоре.
+        if (_dragged is not null && ReferenceEquals(_dragged, _fetchTreat)) return false;
 
         var dx = x - cursor.X;
         var dy = y - cursor.Y;

@@ -248,9 +248,10 @@
             </Border>
         </Canvas>
 
-        <Canvas x:Name="Bugs" ClipToBounds="True" Grid.ColumnSpan="3" IsHitTestVisible="False">
+        <Canvas x:Name="Bugs" ClipToBounds="True" Grid.ColumnSpan="3">
             <!-- Коровка нарисована фигурами: эмодзи в WPF выходит чёрно-белым. -->
-            <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5">
+            <Canvas x:Name="Bug" Width="30" Height="34" RenderTransformOrigin="0.5,0.5"
+                    Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnBugGrab">
                 <Canvas.RenderTransform>
                     <RotateTransform x:Name="BugRotation" Angle="0"/>
                 </Canvas.RenderTransform>
