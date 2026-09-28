@@ -187,6 +187,9 @@ public partial class App : Application
 
         Log.Write($"пробуждение: {reason}");
 
+        // Бот ждёт ответа по соединению, которое сон уже разорвал: начинаем опрос заново.
+        _bot.RestartPolling();
+
         ApplyResumeGrant();
         RenderAll(force: true);
 

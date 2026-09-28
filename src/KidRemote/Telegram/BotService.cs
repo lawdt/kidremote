@@ -43,6 +43,7 @@ internal sealed partial class BotService : IDisposable
     private readonly object _busySync = new();
 
     private Task? _loop;
+    private CancellationTokenSource? _poll;
     private string _lastPanelText = string.Empty;
     private string? _inviteCode;
     private DateTime _inviteExpiresUtc;
@@ -87,7 +88,13 @@ internal sealed partial class BotService : IDisposable
         {
             try
             {
-                var updates = await _client.GetUpdatesAsync(_state.UpdateOffset, PollTimeoutSeconds, ct).ConfigureAwait(false);
+                // Отдельный источник отмены на каждый запрос: по пробуждению его обрывают,
+                // чтобы не ждать ответа по уже мёртвому соединению.
+                using var poll = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                _poll = poll;
+
+                var updates = await _client.GetUpdatesAsync(_state.UpdateOffset, PollTimeoutSeconds, poll.Token)
+                    .ConfigureAwait(false);
 
                 foreach (var update in updates)
                 {
@@ -103,6 +110,11 @@ internal sealed partial class BotService : IDisposable
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 return;
+            }
+            catch (OperationCanceledException)
+            {
+                // Запрос оборвали намеренно — сразу идём на следующий круг.
+                continue;
             }
             catch
             {
@@ -812,6 +824,22 @@ internal sealed partial class BotService : IDisposable
         finally
         {
             _outbox.Release();
+        }
+    }
+
+    /// <summary>
+    /// Прерывает текущее ожидание обновлений. Нужно после пробуждения: старое соединение
+    /// уже мертво, и без этого команды не доходят до конца таймаута.
+    /// </summary>
+    public void RestartPolling()
+    {
+        try
+        {
+            _poll?.Cancel();
+        }
+        catch
+        {
+            // Источник уже освобождён — следующий цикл всё равно создаст новый.
         }
     }
 

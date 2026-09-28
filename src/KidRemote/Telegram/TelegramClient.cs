@@ -18,10 +18,20 @@ internal sealed class TelegramClient : IDisposable
     public TelegramClient(string token)
     {
         _baseUrl = $"https://api.telegram.org/bot{token}/";
-        _http = new HttpClient
+
+        // После сна соединения из пула мертвы, но выглядят живыми: ограничиваем их срок жизни,
+        // иначе первый запрос после пробуждения молча ждёт до таймаута.
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(40),
+            ConnectTimeout = TimeSpan.FromSeconds(15)
+        };
+
+        _http = new HttpClient(handler)
         {
             // Чуть больше, чем long polling timeout, иначе валимся по таймауту на каждом цикле.
-            Timeout = TimeSpan.FromSeconds(90)
+            Timeout = TimeSpan.FromSeconds(45)
         };
     }
 
