@@ -44,7 +44,10 @@ public partial class LockOverlayWindow : Window
     private static readonly TimeSpan OfflineNap = TimeSpan.FromSeconds(20);
 
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
-    private const double SecretRadius = 62;
+    private const double SecretRadius = 70;
+
+    /// <summary>С такого расстояния испуганная коровка предпочитает спрятаться дома.</summary>
+    private const double HomeLureRadius = 300;
 
     private static readonly Color[] TreatColors =
     {
@@ -70,8 +73,6 @@ public partial class LockOverlayWindow : Window
     private BugMood _bugMood = BugMood.Wander;
     private FrameworkElement? _carried;
     private double _walkPhase;
-    private Point _lockCenter;
-    private bool _lockCentreKnown;
     private bool _secretFound;
     private DateTime _atHomeSince;
     private DateTime _peekUntil;
@@ -341,6 +342,15 @@ public partial class LockOverlayWindow : Window
         _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
     }
 
+    /// <summary>Роняет ношу на месте: так бывает, когда находится добыча получше.</summary>
+    private void StoreTreatWhereItIs()
+    {
+        if (_carried is null) return;
+
+        _treats.Add(_carried);
+        _carried = null;
+    }
+
     private void StoreTreat()
     {
         if (_carried is null) return;
@@ -386,8 +396,8 @@ public partial class LockOverlayWindow : Window
     /// </summary>
     private void CheckSecret(double bugX, double bugY)
     {
-        if (_secretFound || _carried is not null) return;
-        if (_bugMood is not (BugMood.Wander or BugMood.Fetching)) return;
+        if (_secretFound) return;
+        if (_bugMood is not (BugMood.Wander or BugMood.Fetching or BugMood.GoingHome)) return;
 
         var centre = LockCentre();
         if (centre.X <= 0) return;
@@ -397,6 +407,10 @@ public partial class LockOverlayWindow : Window
 
         Core.Log.Write("коровка нашла золотое яблоко под замком");
         _secretFound = true;
+
+        // Крошку, если несла, оставляем под замком — руки заняты находкой поважнее.
+        if (_carried is not null) StoreTreatWhereItIs();
+
         _carried = CreateGoldenApple(centre);
 
         Bugs.Children.Add(_carried);
@@ -409,22 +423,17 @@ public partial class LockOverlayWindow : Window
 
     private Point LockCentre()
     {
-        if (_lockCentreKnown) return _lockCenter;
         if (Glyph.ActualWidth <= 0 || Bugs.ActualWidth <= 0) return new Point(0, 0);
 
         try
         {
-            _lockCenter = Glyph.TransformToVisual(Bugs)
+            return Glyph.TransformToVisual(Bugs)
                 .Transform(new Point(Glyph.ActualWidth / 2, Glyph.ActualHeight / 2));
-
-            _lockCentreKnown = true;
         }
         catch
         {
             return new Point(0, 0);
         }
-
-        return _lockCenter;
     }
 
     /// <summary>Яблоко нарочно крупное: находка должна быть заметной.</summary>
@@ -623,9 +632,11 @@ public partial class LockOverlayWindow : Window
         const double margin = 30;
         _bugPauseLeft = 0;
 
-        // Домик рядом — прячемся туда, так его и можно загнать курсором.
-        if (_bugMood == BugMood.Wander &&
-            Math.Sqrt(Math.Pow(x - (_bugHome.X + 29), 2) + Math.Pow(y - (_bugHome.Y + 20), 2)) < 220)
+        // Уже спешит домой или тащит добычу — цель менять нельзя, иначе никогда не дойдёт.
+        if (_bugMood is BugMood.GoingHome or BugMood.Carrying) return true;
+
+        // Домик неподалёку — коровка ныряет туда, так её и загоняют курсором.
+        if (Math.Sqrt(Math.Pow(x - (_bugHome.X + 29), 2) + Math.Pow(y - (_bugHome.Y + 20), 2)) < HomeLureRadius)
         {
             _bugMood = BugMood.GoingHome;
             _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
