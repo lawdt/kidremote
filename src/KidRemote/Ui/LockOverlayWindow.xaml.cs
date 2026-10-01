@@ -57,7 +57,7 @@ public partial class LockOverlayWindow : Window
     private const double SecretRadius = 90;
 
     /// <summary>Как часто коровка соблазняется смайликом из переписки.</summary>
-    private const double ChatTheftChance = 0.3;
+    private const double ChatTheftChance = 0.45;
 
     /// <summary>Передышка у домика после занесённой крошки, секунды.</summary>
     private const double DeliveryPause = 5;
@@ -1250,6 +1250,7 @@ public partial class LockOverlayWindow : Window
 
         // В переписке смайлик пропадает — до следующей перерисовки чата.
         victim.Opacity = 0;
+        Core.Log.Write("коровка утащила смайлик из переписки");
 
         return loot;
     }
