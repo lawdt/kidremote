@@ -56,6 +56,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
     private const double SecretRadius = 90;
 
+    /// <summary>Через столько после последнего движения курсор перестаёт пугать.</summary>
+    private static readonly TimeSpan CursorRestDelay = TimeSpan.FromSeconds(1.5);
+
     /// <summary>Насколько днём коровка предпочитает работу прогулке.</summary>
     private const double WorkChance = 0.75;
 
@@ -105,6 +108,8 @@ public partial class LockOverlayWindow : Window
     private FrameworkElement? _dragged;
     private FrameworkElement? _fetchTreat;
     private readonly DateTime _dayStart = DateTime.Now;
+    private Point _lastCursor;
+    private DateTime _cursorMovedAt = DateTime.Now;
     private DateTime _nextBeg;
     private DateTime _chaseUntil;
     private Point _dragGrabbedAt;
@@ -1023,6 +1028,21 @@ public partial class LockOverlayWindow : Window
         }
     }
 
+    /// <summary>
+    /// Курсор считается живым, пока он шевелится. Неподвижную стрелку коровка
+    /// принимает за часть обстановки и спокойно проходит мимо.
+    /// </summary>
+    private bool CursorIsMoving(Point cursor)
+    {
+        if ((cursor - _lastCursor).Length > 2)
+        {
+            _lastCursor = cursor;
+            _cursorMovedAt = DateTime.Now;
+        }
+
+        return DateTime.Now - _cursorMovedAt < CursorRestDelay;
+    }
+
     private bool CursorNear(double x, double y, double radius)
     {
         try
@@ -1058,6 +1078,9 @@ public partial class LockOverlayWindow : Window
 
         // За своей крошкой коровка идёт смело, даже если та в курсоре.
         if (_dragged is not null && ReferenceEquals(_dragged, _fetchTreat)) return false;
+
+        // Замерший курсор — просто предмет на экране, пугаться нечего.
+        if (!CursorIsMoving(cursor)) return false;
 
         var dx = x - cursor.X;
         var dy = y - cursor.Y;
