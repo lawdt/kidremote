@@ -56,6 +56,9 @@ public partial class LockOverlayWindow : Window
     /// <summary>Насколько близко к замку нужно загнать коровку, чтобы она нашла тайник.</summary>
     private const double SecretRadius = 90;
 
+    /// <summary>Насколько днём коровка предпочитает работу прогулке.</summary>
+    private const double WorkChance = 0.75;
+
     /// <summary>Как часто коровка соблазняется смайликом из переписки.</summary>
     private const double ChatTheftChance = 0.45;
 
@@ -228,7 +231,13 @@ public partial class LockOverlayWindow : Window
         {
             x = width / 2;
             y = height / 2;
-            PickTarget(width, height);
+
+            Canvas.SetLeft(Bug, x);
+            Canvas.SetTop(Bug, y);
+
+            // Днём сразу принимается за работу, а не слоняется без дела.
+            if (IsBugNight()) PickTarget(width, height);
+            else StartFetch();
         }
 
         // Ночь застала снаружи — бросает дела и возвращается в домик.
@@ -309,6 +318,14 @@ public partial class LockOverlayWindow : Window
             {
                 _bugMood = BugMood.GoingHome;
                 _bugTarget = new Point(_bugHome.X + 29, _bugHome.Y + 30);
+                return;
+            }
+
+            // Днём работа важнее прогулок: чаще всего после остановки идёт за добычей.
+            if (!fleeing && !IsBugNight() && _random.NextDouble() < WorkChance)
+            {
+                StartFetch();
+                if (_random.NextDouble() < 0.4) _bugPauseLeft = 1 + _random.NextDouble() * 3;
                 return;
             }
 
