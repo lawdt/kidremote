@@ -109,6 +109,16 @@ public partial class App : Application
         _overlay = new OverlayManager(_config);
         _overlay.MessageSubmitted += SendFromLockScreen;
 
+        // Если прошлый запуск оборвался с замороженной игрой, отпускаем её.
+        _overlay.ThawLeftovers(_state.Frozen);
+        _state.Frozen.Clear();
+
+        _overlay.FrozenChanged += frozen =>
+        {
+            _state.Frozen = frozen.ToList();
+            _store.Save(_state);
+        };
+
         _chat = new ChatLog();
         _chat.Added += OnChatMessage;
         _chat.Changed += () => Dispatcher.BeginInvoke(() => _overlay.SetChat(_chat.Tail(50)));

@@ -89,6 +89,11 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    // Асинхронный вариант: не ждёт ответа чужого окна и потому не вешает нас,
+    // если процесс игры приостановлен или просто не отвечает.
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 

@@ -13,6 +13,21 @@ internal sealed class GameFreezer
 {
     private readonly List<int> _frozen = new();
 
+    /// <summary>Сообщает наружу, кого держим: список переживает перезапуск приложения.</summary>
+    public event Action<IReadOnlyList<int>>? Changed;
+
+    /// <summary>
+    /// Отпускает процессы, оставшиеся замороженными после аварийного завершения.
+    /// Без этого игра так и висела бы до перезагрузки.
+    /// </summary>
+    public void ThawLeftovers(IEnumerable<int> processIds)
+    {
+        foreach (var processId in processIds)
+        {
+            if (Resume(processId)) Log.Write($"заморозка: отпущен процесс {processId} после перезапуска");
+        }
+    }
+
     public void Freeze(int processId)
     {
         if (processId <= 0 || processId == Environment.ProcessId) return;
@@ -31,6 +46,7 @@ internal sealed class GameFreezer
             {
                 _frozen.Add(processId);
                 Log.Write($"заморозка: процесс {processId} приостановлен");
+                Changed?.Invoke(_frozen.ToArray());
             }
         }
         finally
@@ -42,22 +58,27 @@ internal sealed class GameFreezer
     /// <summary>Отпускает все замороженные процессы. Вызывается и при выходе, чтобы игра не осталась висеть.</summary>
     public void ThawAll()
     {
-        foreach (var processId in _frozen.ToArray())
-        {
-            var handle = NativeMethods.OpenProcess(NativeMethods.PROCESS_SUSPEND_RESUME, false, (uint)processId);
-            if (handle == IntPtr.Zero) continue;
+        if (_frozen.Count == 0) return;
 
-            try
-            {
-                NativeMethods.NtResumeProcess(handle);
-            }
-            finally
-            {
-                NativeMethods.CloseHandle(handle);
-            }
-        }
+        foreach (var processId in _frozen.ToArray()) Resume(processId);
 
         _frozen.Clear();
+        Changed?.Invoke(Array.Empty<int>());
+    }
+
+    private static bool Resume(int processId)
+    {
+        var handle = NativeMethods.OpenProcess(NativeMethods.PROCESS_SUSPEND_RESUME, false, (uint)processId);
+        if (handle == IntPtr.Zero) return false;
+
+        try
+        {
+            return NativeMethods.NtResumeProcess(handle) == 0;
+        }
+        finally
+        {
+            NativeMethods.CloseHandle(handle);
+        }
     }
 
     /// <summary>Процесс окна на переднем плане, если это похоже на игру.</summary>

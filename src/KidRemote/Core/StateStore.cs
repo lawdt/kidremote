@@ -20,6 +20,10 @@ internal sealed class PersistedState
     [JsonPropertyName("panelMessages")]
     public Dictionary<string, long> PanelMessages { get; set; } = new();
 
+    /// <summary>Процессы, замороженные на время блокировки. Нужны, чтобы отпустить их после сбоя.</summary>
+    [JsonPropertyName("frozen")]
+    public List<int> Frozen { get; set; } = new();
+
     [JsonPropertyName("savedAtUtc")]
     public DateTime SavedAtUtc { get; set; }
 }

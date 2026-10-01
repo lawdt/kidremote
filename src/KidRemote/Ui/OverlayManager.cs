@@ -67,6 +67,15 @@ internal sealed class OverlayManager : IDisposable
 
     public bool IsVisible => _visible;
 
+    /// <summary>Список замороженных процессов — приложение хранит его между запусками.</summary>
+    public event Action<IReadOnlyList<int>>? FrozenChanged
+    {
+        add => _freezer.Changed += value;
+        remove => _freezer.Changed -= value;
+    }
+
+    public void ThawLeftovers(IEnumerable<int> processIds) => _freezer.ThawLeftovers(processIds);
+
     public void Show()
     {
         if (_visible) return;
@@ -76,23 +85,6 @@ internal sealed class OverlayManager : IDisposable
 
         // Новая фраза на каждую блокировку.
         _phrase = Motivation.Next();
-
-        // Игра продолжает читать клавиатуру и джойстик даже без фокуса, поэтому
-        // на время блокировки её процесс замораживается.
-        if (_config.FreezeGameWhenLocked)
-        {
-            var game = GameFreezer.GameInFront(_config);
-            if (game != 0) _freezer.Freeze(game);
-        }
-
-        // Эксклюзивный полноэкранный режим перекрывает любые чужие окна — сворачиваем игру,
-        // иначе ребёнок просто не увидит блокировку.
-        if (_config.MinimizeForegroundOnLock)
-        {
-            var foreground = NativeMethods.GetForegroundWindow();
-            if (foreground != IntPtr.Zero && foreground != NativeMethods.GetShellWindow())
-                NativeMethods.ShowWindow(foreground, NativeMethods.SW_MINIMIZE);
-        }
 
         foreach (var screen in Forms.Screen.AllScreens)
         {
@@ -116,6 +108,11 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+
+        // Игру трогаем в последнюю очередь, когда экран уже закрыт. Порядок важен:
+        // замороженный процесс не отвечает на обращения к своему окну, и попытка
+        // свернуть его до показа оверлея подвешивала нас целиком.
+        HandleGameUnderLock();
 
         // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
         if (_windows.Count > 0) _windows[0].FocusChatInput();
@@ -149,6 +146,11 @@ internal sealed class OverlayManager : IDisposable
         _keepOnTop.Start();
         _clock.Start();
         Reassert();
+
+        // Игру трогаем в последнюю очередь, когда экран уже закрыт. Порядок важен:
+        // замороженный процесс не отвечает на обращения к своему окну, и попытка
+        // свернуть его до показа оверлея подвешивала нас целиком.
+        HandleGameUnderLock();
 
         // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
         if (_windows.Count > 0) _windows[0].FocusChatInput();
