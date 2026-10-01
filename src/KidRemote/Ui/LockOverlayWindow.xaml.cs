@@ -229,8 +229,10 @@ public partial class LockOverlayWindow : Window
         var y = Canvas.GetTop(Bug);
         if (double.IsNaN(x) || double.IsNaN(y))
         {
-            x = width / 2;
-            y = height / 2;
+            // Появляется у своего домика, а не в центре: иначе тайник под замком
+            // достаётся сам собой, без всякого загона курсором.
+            x = _bugHome.X + 70;
+            y = _bugHome.Y - 30;
 
             Canvas.SetLeft(Bug, x);
             Canvas.SetTop(Bug, y);
