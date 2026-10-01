@@ -147,13 +147,33 @@ internal sealed class OverlayManager : IDisposable
         _clock.Start();
         Reassert();
 
-        // Игру трогаем в последнюю очередь, когда экран уже закрыт. Порядок важен:
-        // замороженный процесс не отвечает на обращения к своему окну, и попытка
-        // свернуть его до показа оверлея подвешивала нас целиком.
-        HandleGameUnderLock();
+        // Игра остаётся замороженной с момента блокировки — трогать её повторно незачем.
+        if (_config.FreezeGameWhenLocked) HandleGameUnderLock();
 
         // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
         if (_windows.Count > 0) _windows[0].FocusChatInput();
+    }
+
+    /// <summary>
+    /// Сворачивает и замораживает игру. Вызывается уже после того, как экран блокировки
+    /// на месте: обращаться к окну приостановленного процесса синхронно нельзя.
+    /// </summary>
+    private void HandleGameUnderLock()
+    {
+        var game = GameFreezer.GameInFront(_config);
+
+        // Эксклюзивный полноэкранный режим перекрывает любые чужие окна — сворачиваем игру,
+        // иначе ребёнок просто не увидит блокировку.
+        if (_config.MinimizeForegroundOnLock)
+        {
+            var foreground = NativeMethods.GetForegroundWindow();
+            if (foreground != IntPtr.Zero && foreground != NativeMethods.GetShellWindow())
+                NativeMethods.ShowWindowAsync(foreground, NativeMethods.SW_MINIMIZE);
+        }
+
+        // Игра продолжает читать клавиатуру и джойстик даже без фокуса, поэтому
+        // на время блокировки её процесс замораживается.
+        if (_config.FreezeGameWhenLocked && game != 0) _freezer.Freeze(game);
     }
 
     /// <summary>Сообщение под полем ввода на основном мониторе.</summary>
