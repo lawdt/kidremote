@@ -221,7 +221,7 @@ public partial class LockOverlayWindow : Window
         {
             LookAtCursor();
 
-            if (DateTime.Now >= _peekUntil) HideBack();
+            if (!ReferenceEquals(_dragged, Bug) && DateTime.Now >= _peekUntil) HideBack();
             return;
         }
 
@@ -735,6 +735,16 @@ public partial class LockOverlayWindow : Window
     private void OnBugGrab(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (_bugMood is BugMood.AtHome or BugMood.UnderLock) return;
+
+        // Высунулась на стук, а её вытащили наружу: прятаться обратно уже некуда,
+        // иначе по таймеру она просто исчезнет из курсора.
+        if (_bugMood == BugMood.Peeking)
+        {
+            _bugMood = BugMood.Wander;
+            _peekUntil = default;
+            SpeechBubble.Visibility = Visibility.Collapsed;
+            SetWindowLit(false);
+        }
 
         e.Handled = true;
         StartDrag(Bug, e);
