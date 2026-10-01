@@ -119,19 +119,16 @@ internal sealed class OverlayManager : IDisposable
     }
 
     /// <summary>
-    /// Отпускает экран на время родительского диалога: иначе удержание поверх всех окон
-    /// перекрывает ввод пароля, а хук съедает клавиши.
+    /// Перестаёт тянуть экран блокировки на передний план, чтобы родительское окно не
+    /// утонуло под ним. Всё остальное остаётся на месте: перехват клавиш продолжает
+    /// глушить Alt+Tab, окна держат Topmost, игра — заморожена. Иначе на время ввода
+    /// пароля блокировка просто отключалась бы.
     /// </summary>
     public void SuspendGuard()
     {
         if (!_visible) return;
 
         _keepOnTop.Stop();
-        _clock.Stop();
-        _keyboard.Disable();
-        _freezer.ThawAll();
-
-        foreach (var window in _windows) window.Topmost = false;
     }
 
     public void ResumeGuard()
@@ -140,15 +137,8 @@ internal sealed class OverlayManager : IDisposable
 
         foreach (var window in _windows) window.Topmost = true;
 
-        UpdateClock();
-
-        if (_config.BlockHotkeysWhenLocked) _keyboard.Enable();
         _keepOnTop.Start();
-        _clock.Start();
         Reassert();
-
-        // Игра остаётся замороженной с момента блокировки — трогать её повторно незачем.
-        if (_config.FreezeGameWhenLocked) HandleGameUnderLock();
 
         // Курсор уже в поле ввода: попросить время можно сразу, ничего не нажимая.
         if (_windows.Count > 0) _windows[0].FocusChatInput();
